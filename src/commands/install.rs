@@ -2,10 +2,40 @@ use std::fs::{self, read_dir};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
-pub fn read_metadata(name: String) -> io::Result<String> {
-    let contents = fs::read_to_string(name).expect("Should have been able to read the file");
+#[derive(Debug)]
+pub struct Package {
+    pub name: String,
+    pub version: String,
+    pub dependencies: Vec<String>,
+}
+
+pub fn read_metadata(path: &Path) -> io::Result<Package> {
+    let contents = fs::read_to_string(path)?;
+    let mut name = String::new();
+    let mut version = String::new();
+    let mut dependencies: Vec<String> = Vec::new();
+
     println!("{}", &contents);
-    Ok(contents)
+    for line in contents.lines() {
+        let mut parts = line.splitn(2, "=");
+        let key = parts.next().unwrap_or("").trim();
+        let value = parts.next().unwrap_or("").trim();
+
+        match key {
+            "name" => name = value.to_string(),
+            "version" => version = value.to_string(),
+            "dependency" => dependencies.push(value.to_string()),
+            _ => {}
+        }
+    }
+    let package = Package {
+        name,
+        version,
+        dependencies,
+    };
+
+    println!("{:?}", &package);
+    Ok(package)
 }
 
 pub fn install_package(path: &str) -> io::Result<()> {
@@ -30,4 +60,3 @@ fn collect_files(dir: &Path, files: &mut Vec<PathBuf>) -> io::Result<()> {
     }
     Ok(())
 }
-

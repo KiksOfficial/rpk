@@ -6,8 +6,11 @@ mod package;
 use commands::install::read_metadata;
 
 use crate::commands::install::install_package;
+use std::path::Path;
 
-fn main() {
-    let _ = read_metadata("/home/kiks/Proge/hello-package/metadata.toml".to_string());
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let package1 = read_metadata(Path::new("/home/kiks/Proge/hello-package/metadata.pkg"))?;
+    println!("{:?}", &package1);
     let _ = install_package("/home/kiks/Proge/hello-package");
+    Ok(())
 }
