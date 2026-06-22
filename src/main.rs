@@ -11,6 +11,6 @@ use std::path::Path;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let package1 = read_metadata(Path::new("/home/kiks/Proge/hello-package/metadata.pkg"))?;
     println!("{:?}", &package1);
-    let _ = install_package("/home/kiks/Proge/hello-package");
+    install_package("/home/kiks/Proge/hello-package");
     Ok(())
 }

@@ -1,4 +1,4 @@
-use std::fs::{self, read_dir};
+use std::fs::{self, read_dir, rename};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
@@ -43,9 +43,28 @@ pub fn read_metadata(path: &Path) -> io::Result<Package> {
 
 pub fn install_package(path: &str) -> io::Result<()> {
     let mut files = Vec::new();
+    let base_path = Path::new("/home/kiks/Proge/");
 
-    collect_files(Path::new(path), &mut files)?;
-    println!("Files found: {:?}", files);
+    let package_path = Path::new(path);
+    let package_name = package_path.file_name().unwrap();
+
+    let rootfs = package_path.join("rootfs");
+
+    let install_root = base_path.join(Path::new("fake-root").join(package_name));
+
+    collect_files(&rootfs, &mut files)?;
+
+    for file in &files {
+        if let Ok(relative) = file.strip_prefix(&rootfs) {
+            let dest = install_root.join(relative);
+
+            if let Some(parent) = dest.parent() {
+                fs::create_dir_all(parent)?;
+            }
+
+            fs::rename(file, dest)?;
+        }
+    }
 
     Ok(())
 }
@@ -61,5 +80,6 @@ fn collect_files(dir: &Path, files: &mut Vec<PathBuf>) -> io::Result<()> {
             files.push(path);
         }
     }
+
     Ok(())
 }
