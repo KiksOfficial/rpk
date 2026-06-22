@@ -17,15 +17,18 @@ pub fn read_metadata(path: &Path) -> io::Result<Package> {
 
     println!("{}", &contents);
     for line in contents.lines() {
-        let mut parts = line.splitn(2, "=");
-        let key = parts.next().unwrap_or("").trim();
-        let value = parts.next().unwrap_or("").trim();
+        let trimmed = line.trim();
+        if !trimmed.is_empty() && !trimmed.starts_with('#') {
+            let mut parts = trimmed.splitn(2, "=");
+            let key = parts.next().unwrap_or("").trim();
+            let value = parts.next().unwrap_or("").trim();
 
-        match key {
-            "name" => name = value.to_string(),
-            "version" => version = value.to_string(),
-            "dependency" => dependencies.push(value.to_string()),
-            _ => {}
+            match key {
+                "name" => name = value.to_string(),
+                "version" => version = value.to_string(),
+                "dependency" => dependencies.push(value.to_string()),
+                _ => {}
+            }
         }
     }
     let package = Package {
