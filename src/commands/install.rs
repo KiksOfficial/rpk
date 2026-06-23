@@ -1,6 +1,7 @@
 use std::fs::{self, read_dir, rename};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 #[derive(Debug)]
 pub struct Package {
@@ -82,4 +83,17 @@ fn collect_files(dir: &Path, files: &mut Vec<PathBuf>) -> io::Result<()> {
     }
 
     Ok(())
+}
+
+pub fn download_package(url: &str, output_path: &str) -> Result<(), String> {
+    let downloading = Command::new("curl")
+        .args(&["-fsSL", "-s", "-o", output_path, url])
+        .status()
+        .map_err(|e| e.to_string())?;
+
+    if downloading.success() {
+        Ok(())
+    } else {
+        Err("Download failed".to_string())
+    }
 }
