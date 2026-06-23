@@ -85,9 +85,15 @@ fn collect_files(dir: &Path, files: &mut Vec<PathBuf>) -> io::Result<()> {
     Ok(())
 }
 
-pub fn download_package(url: &str, output_path: &str) -> Result<(), String> {
+pub fn download_package(url: &str, output_path: &Path) -> Result<(), String> {
     let downloading = Command::new("curl")
-        .args(&["-fsSL", "-s", "-o", output_path, url])
+        .args([
+            "-fsSL",
+            "-s",
+            "-o",
+            output_path.to_str().ok_or("Invalid output path")?,
+            url,
+        ])
         .status()
         .map_err(|e| e.to_string())?;
 
