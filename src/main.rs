@@ -2,7 +2,8 @@ mod commands;
 mod filesystem;
 mod package;
 
-use commands::install::{download_package, read_metadata, unpack_package};
+use commands::install::{download_package, read_metadata};
+use filesystem::unpack_package;
 use package::get_link;
 use std::env::args;
 use std::path::Path;

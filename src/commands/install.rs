@@ -41,7 +41,6 @@ pub fn read_metadata(path: &Path) -> io::Result<Package> {
     println!("{:?}", &package);
     Ok(package)
 }
-
 pub fn download_package(url: &str, output_path: &Path) -> Result<(), String> {
     let downloading = Command::new("curl")
         .args([
@@ -61,19 +60,38 @@ pub fn download_package(url: &str, output_path: &Path) -> Result<(), String> {
     }
 }
 
-pub fn unpack_package(src_path: &Path, dest_path: &Path) -> Result<(), String> {
-    let unpack = Command::new("tar")
-        .args([
-            "-xf",
-            src_path.to_str().ok_or("Src path does not exist")?,
-            "-C",
-            dest_path.to_str().ok_or("Dest path does not exist")?,
-        ])
-        .status()
-        .map_err(|e| e.to_string())?;
-    if unpack.success() {
-        Ok(())
-    } else {
-        Err("Failed to unpack".to_string())
+pub fn get_link(pkg_name: &str) -> Result<String, String> {
+    let path = "/home/kiks/Proge/fake-root/core.txt";
+
+    if !Path::new(path).exists() {
+        let status = Command::new("curl")
+            .args(&[
+                "-fsSL",
+                "-o",
+                path,
+                "https://raw.githubusercontent.com/KiksOfficial/rpk_db/main/core.txt",
+            ])
+            .status()
+            .map_err(|e| e.to_string())?;
+
+        if !status.success() {
+            return Err("Failed to download core.txt".to_string());
+        }
     }
+
+    let sisu = fs::read_to_string(path).map_err(|e| e.to_string())?;
+
+    for line in sisu.lines() {
+        let mut parts = line.split_whitespace();
+
+        if let Some(name) = parts.next() {
+            if name == pkg_name {
+                if let Some(url) = parts.next() {
+                    return Ok(url.to_string());
+                }
+            }
+        }
+    }
+
+    Err(format!("Package '{}' not found", pkg_name))
 }
