@@ -14,7 +14,7 @@ pub fn remove_package(pkg_name: &str) -> io::Result<()> {
         }
     }
 
-    let db_folder = Path::new("/home/kiks/Proge/fake-root/local-db");
+    let db_folder = Path::new("/home/kiks/Proge/fake-root/local-db").join(pkg_name);
     fs::remove_dir(db_folder)?;
 
     println!("Package {} has been deleted", &pkg_name);
