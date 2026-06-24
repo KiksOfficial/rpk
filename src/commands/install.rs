@@ -42,49 +42,6 @@ pub fn read_metadata(path: &Path) -> io::Result<Package> {
     Ok(package)
 }
 
-pub fn install_package(path: &str) -> io::Result<()> {
-    let mut files = Vec::new();
-    let base_path = Path::new("/home/kiks/Proge/");
-
-    let package_path = Path::new(path);
-    let package_name = package_path.file_name().unwrap();
-
-    let rootfs = package_path.join("rootfs");
-
-    let install_root = base_path.join(Path::new("fake-root").join(package_name));
-
-    collect_files(&rootfs, &mut files)?;
-
-    for file in &files {
-        if let Ok(relative) = file.strip_prefix(&rootfs) {
-            let dest = install_root.join(relative);
-
-            if let Some(parent) = dest.parent() {
-                fs::create_dir_all(parent)?;
-            }
-
-            fs::rename(file, dest)?;
-        }
-    }
-
-    Ok(())
-}
-
-fn collect_files(dir: &Path, files: &mut Vec<PathBuf>) -> io::Result<()> {
-    for entry in fs::read_dir(dir)? {
-        let entry = entry?;
-        let path = entry.path();
-
-        if path.is_dir() {
-            collect_files(&path, files)?;
-        } else {
-            files.push(path);
-        }
-    }
-
-    Ok(())
-}
-
 pub fn download_package(url: &str, output_path: &Path) -> Result<(), String> {
     let downloading = Command::new("curl")
         .args([
@@ -101,5 +58,22 @@ pub fn download_package(url: &str, output_path: &Path) -> Result<(), String> {
         Ok(())
     } else {
         Err("Download failed".to_string())
+    }
+}
+
+pub fn unpack_package(src_path: &Path, dest_path: &Path) -> Result<(), String> {
+    let unpack = Command::new("tar")
+        .args([
+            "-xf",
+            src_path.to_str().ok_or("Src path does not exist")?,
+            "-C",
+            dest_path.to_str().ok_or("Dest path does not exist")?,
+        ])
+        .status()
+        .map_err(|e| e.to_string())?;
+    if unpack.success() {
+        Ok(())
+    } else {
+        Err("Failed to unpack".to_string())
     }
 }
