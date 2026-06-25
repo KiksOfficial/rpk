@@ -1,13 +1,15 @@
-use std::fs::{self, read_dir, rename};
-use std::io::{self, Write};
-use std::path::{Path, PathBuf};
+use std::fs::{self};
+use std::io::{self};
+use std::path::Path;
 use std::process::Command;
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct Package {
     pub name: String,
     pub version: String,
     pub dependencies: Vec<String>,
+    pub files: Vec<String>,
 }
 
 pub fn read_metadata(path: &Path) -> io::Result<Package> {
@@ -15,6 +17,7 @@ pub fn read_metadata(path: &Path) -> io::Result<Package> {
     let mut name = String::new();
     let mut version = String::new();
     let mut dependencies: Vec<String> = Vec::new();
+    let mut files: Vec<String> = Vec::new();
 
     println!("{}", &contents);
     for line in contents.lines() {
@@ -28,6 +31,7 @@ pub fn read_metadata(path: &Path) -> io::Result<Package> {
                 "name" => name = value.to_string(),
                 "version" => version = value.to_string(),
                 "dependency" => dependencies.push(value.to_string()),
+                "file" => files.push(value.to_string()),
                 _ => {}
             }
         }
@@ -36,6 +40,7 @@ pub fn read_metadata(path: &Path) -> io::Result<Package> {
         name,
         version,
         dependencies,
+        files,
     };
 
     println!("{:?}", &package);
@@ -60,17 +65,16 @@ pub fn download_package(url: &str, output_path: &Path) -> Result<(), String> {
     }
 }
 
-pub fn get_link(pkg_name: &str) -> Result<String, String> {
-    let path = "/home/kiks/Proge/fake-root/core.txt";
+pub fn get_link(pkg_name: &str, db_url: &str) -> Result<String, String> {
+    let path = "/home/kiks/Proge/sync/core.txt";
+    let path_obj = Path::new(path);
 
+    if let Some(parent) = path_obj.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
     if !Path::new(path).exists() {
         let status = Command::new("curl")
-            .args(&[
-                "-fsSL",
-                "-o",
-                path,
-                "https://raw.githubusercontent.com/KiksOfficial/rpk_db/main/core.txt",
-            ])
+            .args(&["-fsSL", "-o", path, db_url])
             .status()
             .map_err(|e| e.to_string())?;
 
