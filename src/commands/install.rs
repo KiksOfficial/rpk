@@ -7,6 +7,7 @@ use std::process::Command;
 #[allow(dead_code)]
 pub struct Package {
     pub name: String,
+    pub file_name: String,
     pub version: String,
     pub dependencies: Vec<String>,
     pub files: Vec<String>,
@@ -14,30 +15,39 @@ pub struct Package {
 
 pub fn read_metadata(path: &Path) -> io::Result<Package> {
     let contents = fs::read_to_string(path)?;
+    let mut file_name = String::new();
     let mut name = String::new();
     let mut version = String::new();
     let mut dependencies: Vec<String> = Vec::new();
     let mut files: Vec<String> = Vec::new();
+    let mut current = String::new();
+
+    let repo_base_url = "https://mirrors.edge.kernel.org/archlinux/core/os/x86_64/";
 
     println!("{}", &contents);
     for line in contents.lines() {
         let trimmed = line.trim();
-        if !trimmed.is_empty() && !trimmed.starts_with('#') {
-            let mut parts = trimmed.splitn(2, "=");
-            let key = parts.next().unwrap_or("").trim();
-            let value = parts.next().unwrap_or("").trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
 
-            match key {
-                "name" => name = value.to_string(),
-                "version" => version = value.to_string(),
-                "dependency" => dependencies.push(value.to_string()),
-                "file" => files.push(value.to_string()),
+        if trimmed.starts_with("%") && trimmed.ends_with("%") {
+            current = trimmed.to_string()
+        } else {
+            match current.as_str() {
+                "%NAME%" => name = trimmed.to_string(),
+                "%FILENAME%" => file_name = trimmed.to_string(),
+                "%VERSION%" => version = trimmed.to_string(),
+                "%DEPENDS%" => dependencies.push(trimmed.to_string()),
+                "%FILES%" => files.push(trimmed.to_string()),
                 _ => {}
             }
         }
     }
+    let full_url = format!("{}{}", repo_base_url, file_name);
     let package = Package {
         name,
+        file_name,
         version,
         dependencies,
         files,
@@ -46,7 +56,7 @@ pub fn read_metadata(path: &Path) -> io::Result<Package> {
     println!("{:?}", &package);
     Ok(package)
 }
-pub fn download_package(url: &str, output_path: &Path) -> Result<(), String> {
+pub fn download_file(url: &str, output_path: &Path) -> Result<(), String> {
     let downloading = Command::new("curl")
         .args([
             "-fsSL",

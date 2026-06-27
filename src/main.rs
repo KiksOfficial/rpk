@@ -2,7 +2,7 @@ mod commands;
 mod filesystem;
 mod package;
 
-use commands::install::{download_package, get_link, read_metadata};
+use commands::install::{download_file, get_link, read_metadata};
 use filesystem::unpack_package;
 use std::env::args;
 use std::path::Path;
@@ -19,9 +19,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     }*/
     let db = "https://raw.githubusercontent.com/KiksOfficial/rpk_db/main/core.txt";
+    let _ = update_mirrors();
     if let Ok(pkg_link) = get_link("fastfetch", db) {
         let output_path = Path::new("/tmp/fastfetch.tar.gz");
-        download_package(&pkg_link, output_path)?;
+        download_file(&pkg_link, output_path)?;
 
         let fake_root = Path::new("/home/kiks/Proge/fake-root");
 
