@@ -1,6 +1,6 @@
-use std::fs::{self, File, create_dir, read_dir, rename};
+use std::fs::{File, create_dir};
 use std::io::{self, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
 pub fn unpack_package(src_path: &Path, dest_path: &Path) -> Result<(), String> {

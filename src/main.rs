@@ -3,6 +3,7 @@ mod filesystem;
 mod package;
 
 use commands::install::{download_file, get_link, read_metadata};
+use commands::update_mirrors::update_mirrors;
 use filesystem::unpack_package;
 use std::env::args;
 use std::path::Path;

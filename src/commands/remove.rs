@@ -1,6 +1,7 @@
 use std::fs::{remove_dir, remove_dir_all, remove_file};
 use std::io;
 use std::{fs, path::Path};
+
 pub fn remove_package(pkg_name: &str) -> io::Result<()> {
     let files_txt_path = Path::new("/home/kiks/Proge/fake-root/local-db")
         .join(pkg_name)
