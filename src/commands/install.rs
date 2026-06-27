@@ -3,8 +3,6 @@ use std::io;
 use std::path::Path;
 use std::process::Command;
 
-use crate::commands::update_mirrors::update_mirrors;
-
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct Package {
@@ -23,8 +21,6 @@ pub fn read_metadata(path: &Path) -> io::Result<Package> {
     let mut dependencies: Vec<String> = Vec::new();
     let mut files: Vec<String> = Vec::new();
     let mut current = String::new();
-
-    let repo_base_url = "https://mirrors.edge.kernel.org/archlinux/core/os/x86_64/";
 
     println!("{}", &contents);
     for line in contents.lines() {
@@ -47,7 +43,6 @@ pub fn read_metadata(path: &Path) -> io::Result<Package> {
         }
     }
 
-    let _full_url = format!("{}{}", repo_base_url, file_name);
     let package = Package {
         name,
         file_name,
@@ -63,7 +58,7 @@ pub fn read_metadata(path: &Path) -> io::Result<Package> {
 pub fn download_file(url: &str, output_path: &Path) -> io::Result<()> {
     let path_str = output_path
         .to_str()
-        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Vigane failitee"))?;
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "incorrect file path"))?;
 
     let status = Command::new("curl")
         .args(&["-fsSL", "-o", path_str, url])
@@ -102,7 +97,6 @@ pub fn get_link(pkg_name: &str, repo_name: &str) -> Result<String, String> {
                     let mut current_filename = String::new();
                     let mut current_section = String::new();
 
-                    // Parsime desc faili ridu täpselt nii nagu su algses koodis
                     for line in sisu.lines() {
                         let trimmed = line.trim();
                         if trimmed.is_empty() || trimmed.starts_with('#') {
@@ -120,10 +114,11 @@ pub fn get_link(pkg_name: &str, repo_name: &str) -> Result<String, String> {
                         }
                     }
 
-                    // Kui leidsime õige paketi nime, tagastame unikaalse allalaadimislingi
                     if current_name == pkg_name {
-                        let repo_base_url =
-                            format!("https://mirror.archlinux.org/{}/os/x86_64/", repo_name);
+                        let repo_base_url = format!(
+                            "https://mirrors.kernel.org/archlinux/{}/os/x86_64/",
+                            repo_name
+                        );
                         return Ok(format!("{}{}", repo_base_url, current_filename));
                     }
                 }
