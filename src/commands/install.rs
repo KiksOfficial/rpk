@@ -3,6 +3,8 @@ use std::io;
 use std::path::Path;
 use std::process::Command;
 
+use crate::commands::update_mirrors::update_mirrors;
+
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct Package {
@@ -77,58 +79,61 @@ pub fn download_file(url: &str, output_path: &Path) -> Result<(), String> {
     }
 }
 
-pub fn get_link(pkg_name: &str, db_url: &str) -> Result<String, String> {
-    let path = "/home/kiks/Proge/sync/core.txt";
-    let path_obj = Path::new(path);
+pub fn get_link(pkg_name: &str, repo_name: &str) -> Result<String, String> {
+    let db_dir_path = format!("/tmp/mirror_list/{}_db", repo_name);
+    let db_dir = Path::new(&db_dir_path);
 
-    if let Some(parent) = path_obj.parent() {
-        let _ = fs::create_dir_all(parent);
+    if !db_dir.exists() {
+        return Err(format!("Db dir: ({:?}) not found", db_dir));
     }
 
-    if !path_obj.exists() {
-        let status = Command::new("curl")
-            .args(&["-fsSL", "-o", path, db_url])
-            .status()
-            .map_err(|e| e.to_string())?;
+    let entries = fs::read_dir(db_dir).map_err(|e| e.to_string())?;
 
-        if !status.success() {
-            return Err("Failed to download core.txt".to_string());
-        }
-    }
+    for entry in entries {
+        if let Ok(entry) = entry {
+            let path = entry.path();
 
-    let sisu = fs::read_to_string(path).map_err(|e| e.to_string())?;
+            if path.is_dir() {
+                let desc_path = path.join("desc");
 
-    for block in sisu.split("\n\n") {
-        if block.is_empty() {
-            continue;
-        }
+                if desc_path.exists() {
+                    let sisu = fs::read_to_string(&desc_path).map_err(|e| e.to_string())?;
 
-        let mut current_name = String::new();
-        let mut current_filename = String::new();
-        let mut current_section = String::new();
+                    let mut current_name = String::new();
+                    let mut current_filename = String::new();
+                    let mut current_section = String::new();
 
-        for line in block.lines() {
-            let trimmed = line.trim();
-            if trimmed.is_empty() || trimmed.starts_with('#') {
-                continue;
-            }
+                    // Parsime desc faili ridu täpselt nii nagu su algses koodis
+                    for line in sisu.lines() {
+                        let trimmed = line.trim();
+                        if trimmed.is_empty() || trimmed.starts_with('#') {
+                            continue;
+                        }
 
-            if trimmed.starts_with('%') && trimmed.ends_with('%') {
-                current_section = trimmed.to_string();
-            } else {
-                match current_section.as_str() {
-                    "%NAME%" => current_name = trimmed.to_string(),
-                    "%FILENAME%" => current_filename = trimmed.to_string(),
-                    _ => {}
+                        if trimmed.starts_with('%') && trimmed.ends_with('%') {
+                            current_section = trimmed.to_string();
+                        } else {
+                            match current_section.as_str() {
+                                "%NAME%" => current_name = trimmed.to_string(),
+                                "%FILENAME%" => current_filename = trimmed.to_string(),
+                                _ => {}
+                            }
+                        }
+                    }
+
+                    // Kui leidsime õige paketi nime, tagastame unikaalse allalaadimislingi
+                    if current_name == pkg_name {
+                        let repo_base_url =
+                            format!("https://mirror.archlinux.org/{}/os/x86_64/", repo_name);
+                        return Ok(format!("{}{}", repo_base_url, current_filename));
+                    }
                 }
             }
         }
-
-        if current_name == pkg_name {
-            let repo_base_url = "https://mirrors.edge.kernel.org/archlinux/core/os/x86_64/";
-            return Ok(format!("{}{}", repo_base_url, current_filename));
-        }
     }
 
-    Err(format!("Package '{}' not found", pkg_name))
+    Err(format!(
+        "Package '{}' not found in repo '{}'",
+        pkg_name, repo_name
+    ))
 }
