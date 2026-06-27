@@ -58,22 +58,21 @@ pub fn read_metadata(path: &Path) -> io::Result<Package> {
     Ok(package)
 }
 
-pub fn download_file(url: &str, output_path: &Path) -> Result<(), String> {
-    let downloading = Command::new("curl")
-        .args([
-            "-fsSL",
-            "-s",
-            "-o",
-            output_path.to_str().ok_or("Invalid output path")?,
-            url,
-        ])
-        .status()
-        .map_err(|e| e.to_string())?;
+pub fn download_file(url: &str, output_path: &Path) -> io::Result<()> {
+    let path_str = output_path
+        .to_str()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Vigane failitee"))?;
 
-    if downloading.success() {
+    let status = Command::new("curl")
+        .args(&["-fsSL", "-o", path_str, url])
+        .status()?;
+    if status.success() {
         Ok(())
     } else {
-        Err("Download failed".to_string())
+        Err(io::Error::new(
+            io::ErrorKind::Other,
+            format!("curl gave an error: {:?}", status.code()),
+        ))
     }
 }
 
