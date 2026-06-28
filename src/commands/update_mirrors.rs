@@ -6,25 +6,33 @@ use std::path::Path;
 
 pub fn update_mirrors() -> io::Result<()> {
     println!("Updating mirrors...");
-    let mirrors_list = ["core", "extra"];
-    let mirror_url = "https://mirrors.kernel.org/archlinux";
 
-    for mirror in mirrors_list {
-        let url = format!("{}/{}/os/x86_64/{}.db", mirror_url, mirror, mirror);
+    let mirrors = ["core", "extra"];
+    let base_url = "https://mirrors.kernel.org/archlinux";
 
-        let src_path = Path::new("/tmp").join(format!("{}.db", mirror));
-        let dest_path = Path::new("/tmp/mirror_list").join(format!("{}_db", mirror));
+    for mirror in mirrors {
+        let url = format!("{}/{}/os/x86_64/{}.db", base_url, mirror, mirror);
+
+        let src_path = Path::new("/tmp").join(format!("{mirror}.db"));
+        let dest_path = Path::new("/tmp/mirror_list").join(format!("{mirror}_db"));
+
+        if dest_path.exists() {
+            fs::remove_dir_all(&dest_path)?;
+        }
+        fs::create_dir_all(&dest_path)?;
 
         if src_path.exists() {
-            let _ = std::fs::remove_file(&src_path);
+            fs::remove_file(&src_path)?;
         }
 
-        println!("Downloading: {}...", url);
+        println!("Downloading {url}...");
         install::download_file(&url, &src_path)?;
 
-        println!("Unpacking: {:?} -> {:?}", src_path, dest_path);
-        std::fs::create_dir_all(&dest_path)?;
+        println!("Unpacking {:?} -> {:?}", src_path, dest_path);
         let _ = unpack_package(&src_path, &dest_path);
+
+        fs::remove_file(&src_path)?;
     }
+
     Ok(())
 }
