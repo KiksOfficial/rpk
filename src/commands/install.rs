@@ -1,3 +1,5 @@
+use crate::filesystem::unpack_package;
+use std::collections::HashSet;
 use std::fs;
 use std::io;
 use std::path::Path;
@@ -11,6 +13,7 @@ pub struct Package {
     pub version: String,
     pub dependencies: Vec<String>,
     pub files: Vec<String>,
+    pub soname_dependencies: Vec<String>,
 }
 
 pub fn read_metadata(path: &Path) -> io::Result<Package> {
@@ -21,6 +24,7 @@ pub fn read_metadata(path: &Path) -> io::Result<Package> {
     let mut dependencies: Vec<String> = Vec::new();
     let mut files: Vec<String> = Vec::new();
     let mut current = String::new();
+    let mut soname_dependencies = Vec::new();
 
     println!("{}", &contents);
     for line in contents.lines() {
@@ -49,10 +53,48 @@ pub fn read_metadata(path: &Path) -> io::Result<Package> {
         version,
         dependencies,
         files,
+        soname_dependencies,
     };
 
     println!("{:?}", &package);
     Ok(package)
+}
+
+pub fn pkg_info(path: &Path) -> io::Result<Package> {
+    let contents = fs::read_to_string(path)?;
+
+    let mut name = String::new();
+    let mut version = String::new();
+    let mut dependencies = Vec::new();
+    let mut soname_dependencies = Vec::new();
+
+    for line in contents.lines() {
+        if let Some((key, value)) = line.split_once(" = ") {
+            match key {
+                "pkgname" => name = value.to_string(),
+                "pkgver" => version = value.to_string(),
+                "depend" => {
+                    if value.contains(".so=") {
+                        soname_dependencies.push(value.to_string());
+                    } else if value.contains(">=") {
+                        continue;
+                    } else {
+                        dependencies.push(value.to_string());
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    Ok(Package {
+        name,
+        file_name: String::new(),
+        version,
+        dependencies,
+        files: Vec::new(),
+        soname_dependencies,
+    })
 }
 
 pub fn download_file(url: &str, output_path: &Path) -> io::Result<()> {
@@ -130,4 +172,57 @@ pub fn get_link(pkg_name: &str, repo_name: &str) -> Result<String, String> {
         "Package '{}' not found in repo '{}'",
         pkg_name, repo_name
     ))
+}
+
+pub fn install_pkg(
+    package_name: &str,
+    visited: &mut HashSet<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    if !visited.insert(package_name.to_string()) {
+        return Ok(());
+    }
+
+    let mut link_found = None;
+    let repos = ["core", "extra"];
+
+    for repo in repos {
+        if let Ok(link) = get_link(package_name, repo) {
+            link_found = Some(link);
+            break;
+        }
+    }
+
+    match link_found {
+        Some(pkg_link) => {
+            let file_name = format!("{}.tar.zst", package_name);
+            let output_path = Path::new("/tmp").join(&file_name);
+
+            println!("Downloading {}...", package_name);
+            download_file(&pkg_link, &output_path)?;
+
+            let fake_root = Path::new("/home/kiks/Proge/fake-root");
+            println!("Unpacking to fake-root...");
+            unpack_package(&output_path, fake_root)?;
+
+            let metadata_path = fake_root.join(".PKGINFO");
+
+            if metadata_path.exists() {
+                let package1 = pkg_info(&metadata_path)?;
+                println!("{:?}", &package1);
+
+                for dep in package1.dependencies {
+                    let dep_name = dep.split(&['<', '>', '=', ' '][..]).next().unwrap();
+                    install_pkg(&dep_name, visited)?; // <-- also fix here
+                }
+            } else {
+                println!("Package installed successfully (no metadata.pkg found).");
+            }
+        }
+
+        None => {
+            println!("Pkg '{}' not found in any repo.", package_name);
+        }
+    }
+
+    Ok(())
 }

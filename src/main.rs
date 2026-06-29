@@ -2,11 +2,19 @@ mod commands;
 mod filesystem;
 mod package;
 
-use commands::install::{download_file, get_link, read_metadata};
+use commands::install::{download_file, get_link, install_pkg, pkg_info, read_metadata};
 use commands::update_mirrors::update_mirrors;
 use filesystem::unpack_package;
+use std::collections::HashSet;
 use std::env::args;
 use std::path::Path;
+
+pub fn run_install(args: Vec<String>) -> std::io::Result<()> {
+    let mut visited = HashSet::new();
+    install_pkg(&args[2], &mut visited);
+
+    Ok(())
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let argumendid: Vec<String> = args().collect();
@@ -16,12 +24,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let operation = &argumendid[1];
-    let mut link_found = None;
-
-    if operation == "-S" {
+    if operation == "-Sy" {
+        let _ = update_mirrors();
+    } else if operation == "-S" {
+        run_install(argumendid);
+        /*let mut link_found = None;
         let package_name = &argumendid[2];
         let repos = ["core", "extra"];
-        let _ = update_mirrors();
         for repo in repos {
             if let Ok(link) = get_link(package_name, repo) {
                 link_found = Some(link);
@@ -40,9 +49,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("Unpacking to fake-root...");
                 unpack_package(&output_path, fake_root)?;
 
-                let metadata_path = fake_root.join("metadata.pkg");
+                let metadata_path = fake_root.join(".PKGINFO");
                 if metadata_path.exists() {
-                    let package1 = read_metadata(&metadata_path)?;
+                    let package1 = pkg_info(&metadata_path)?;
                     println!("{:?}", &package1);
                 } else {
                     println!("Package installed successfully (no metadata.pkg found).");
@@ -51,7 +60,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             None => {
                 println!("Pkg '{}' not found in any repo.", package_name);
             }
-        }
+        }*/
     }
 
     Ok(())
