@@ -22,7 +22,9 @@ pub fn unpack_package(src_path: &Path, dest_path: &Path) -> Result<(), String> {
 
 pub fn register_pkg(name: &str, version: &str, desc: &str, files: &[String]) -> io::Result<()> {
     let db_dir = Path::new("/home/kiks/Proge/fake-root/local-db").join(name);
-    create_dir(&db_dir)?;
+    if !db_dir.exists() {
+        create_dir(&db_dir)?;
+    }
 
     let mut meta_file = File::create(db_dir.join("metadata.txt"))?;
     writeln!(meta_file, "name={}", name)?;

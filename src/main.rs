@@ -2,16 +2,21 @@ mod commands;
 mod filesystem;
 mod package;
 
-use commands::install::{download_file, get_link, install_pkg, pkg_info, read_metadata};
+use commands::install::{download_file, get_link, install_pkg, pkg_info};
 use commands::update_mirrors::update_mirrors;
-use filesystem::unpack_package;
 use std::collections::HashSet;
 use std::env::args;
-use std::path::Path;
 
 pub fn run_install(args: Vec<String>) -> std::io::Result<()> {
     let mut visited = HashSet::new();
-    install_pkg(&args[2], &mut visited);
+    for package in args.iter().skip(2) {
+        match install_pkg(package, &mut visited) {
+            Ok(()) => {}
+            Err(e) => {
+                eprintln!("{}", e)
+            }
+        }
+    }
 
     Ok(())
 }

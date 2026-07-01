@@ -1,3 +1,4 @@
+use crate::filesystem::register_pkg;
 use crate::filesystem::unpack_package;
 use std::collections::HashSet;
 use std::fs;
@@ -16,7 +17,7 @@ pub struct Package {
     pub soname_dependencies: Vec<String>,
 }
 
-pub fn read_metadata(path: &Path) -> io::Result<Package> {
+/*pub fn read_metadata(path: &Path) -> io::Result<Package> {
     let contents = fs::read_to_string(path)?;
     let mut file_name = String::new();
     let mut name = String::new();
@@ -58,7 +59,7 @@ pub fn read_metadata(path: &Path) -> io::Result<Package> {
 
     println!("{:?}", &package);
     Ok(package)
-}
+}*/
 
 pub fn pkg_info(path: &Path) -> io::Result<Package> {
     let contents = fs::read_to_string(path)?;
@@ -212,11 +213,12 @@ pub fn install_pkg(
 
                 for dep in package1.dependencies {
                     let dep_name = dep.split(&['<', '>', '=', ' '][..]).next().unwrap();
-                    install_pkg(&dep_name, visited)?; // <-- also fix here
+                    install_pkg(&dep_name, visited)?;
                 }
             } else {
                 println!("Package installed successfully (no metadata.pkg found).");
             }
+            let _ = fs::remove_file(output_path);
         }
 
         None => {
