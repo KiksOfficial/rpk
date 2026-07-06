@@ -1,7 +1,12 @@
 use crate::filesystem::register_pkg;
 use crate::filesystem::unpack_package;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::fmt::format;
 use std::fs;
+use std::fs::create_dir_all;
+use std::fs::read_dir;
+use std::fs::read_to_string;
+use std::fs::write;
 use std::io;
 use std::path::Path;
 use std::process::Command;
@@ -115,84 +120,79 @@ pub fn download_file(url: &str, output_path: &Path) -> io::Result<()> {
         ))
     }
 }
+pub fn build_repos_hashmap(
+    repo: &str,
+    index: &mut HashMap<String, (String, String)>,
+) -> io::Result<()> {
+    let db_dir = Path::new("/tmp/mirror_list").join(format!("{}_db", repo));
+    for entry in read_dir(db_dir)? {
+        let entry = entry?.path();
+        let desc = entry.join("desc");
 
-pub fn get_link(pkg_name: &str, repo_name: &str) -> Result<String, String> {
-    let db_dir_path = format!("/tmp/mirror_list/{}_db", repo_name);
-    let db_dir = Path::new(&db_dir_path);
+        if !desc.exists() {
+            continue;
+        }
 
-    if !db_dir.exists() {
-        return Err(format!("Db dir: ({:?}) not found", db_dir));
-    }
+        let mut name = None;
+        let mut filename = None;
+        let mut section = "";
 
-    let entries = fs::read_dir(db_dir).map_err(|e| e.to_string())?;
+        for line in read_to_string(&desc)?.lines() {
+            match line {
+                "%NAME%" => section = "%NAME%",
+                "%FILENAME%" => section = "%FILENAME%",
+                _ => match section {
+                    "%NAME%" if name.is_none() => name = Some(line.to_owned()),
 
-    for entry in entries {
-        if let Ok(entry) = entry {
-            let path = entry.path();
-
-            if path.is_dir() {
-                let desc_path = path.join("desc");
-
-                if desc_path.exists() {
-                    let sisu = fs::read_to_string(&desc_path).map_err(|e| e.to_string())?;
-
-                    let mut current_name = String::new();
-                    let mut current_filename = String::new();
-                    let mut current_section = String::new();
-
-                    for line in sisu.lines() {
-                        let trimmed = line.trim();
-                        if trimmed.is_empty() || trimmed.starts_with('#') {
-                            continue;
-                        }
-
-                        if trimmed.starts_with('%') && trimmed.ends_with('%') {
-                            current_section = trimmed.to_string();
-                        } else {
-                            match current_section.as_str() {
-                                "%NAME%" => current_name = trimmed.to_string(),
-                                "%FILENAME%" => current_filename = trimmed.to_string(),
-                                _ => {}
-                            }
-                        }
-                    }
-
-                    if current_name == pkg_name {
-                        let repo_base_url = format!(
-                            "https://mirrors.kernel.org/archlinux/{}/os/x86_64/",
-                            repo_name
-                        );
-                        return Ok(format!("{}{}", repo_base_url, current_filename));
-                    }
-                }
+                    "%FILENAME%" if filename.is_none() => filename = Some(line.to_owned()),
+                    _ => {}
+                },
+            }
+            if name.is_some() && filename.is_some() {
+                break;
             }
         }
+        if let (Some(name), Some(filename)) = (name, filename) {
+            index.insert(name, (repo.to_string(), filename));
+        }
     }
+    Ok(())
+}
+pub fn get_link(index: &HashMap<String, (String, String)>, pkg_name: &str) -> Option<String> {
+    index.get(pkg_name).map(|(repo, filename)| {
+        format!(
+            "https://mirrors.kernel.org/archlinux/{}/os/x86_64/{}",
+            repo, filename
+        )
+    })
+}
 
-    Err(format!(
-        "Package '{}' not found in repo '{}'",
-        pkg_name, repo_name
-    ))
+pub fn is_installed(pkg: &str) -> bool {
+    Path::new("/home/kiks/Proge/fake-root/var/lib/rpk_db")
+        .join(pkg)
+        .exists()
+}
+
+pub fn mark_installed(pkg: &str) -> std::io::Result<()> {
+    let dir = Path::new("/home/kiks/Proge/fake-root/var/lib/rpk_db");
+    create_dir_all(dir)?;
+    write(dir.join(pkg), "")
 }
 
 pub fn install_pkg(
+    index: &HashMap<String, (String, String)>,
     package_name: &str,
     visited: &mut HashSet<String>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> io::Result<()> {
     if !visited.insert(package_name.to_string()) {
         return Ok(());
     }
 
-    let mut link_found = None;
-    let repos = ["core", "extra"];
-
-    for repo in repos {
-        if let Ok(link) = get_link(package_name, repo) {
-            link_found = Some(link);
-            break;
-        }
+    if is_installed(package_name) {
+        return Ok(());
     }
 
+    let link_found = get_link(index, package_name);
     match link_found {
         Some(pkg_link) => {
             let file_name = format!("{}.tar.zst", package_name);
@@ -203,7 +203,7 @@ pub fn install_pkg(
 
             let fake_root = Path::new("/home/kiks/Proge/fake-root");
             println!("Unpacking to fake-root...");
-            unpack_package(&output_path, fake_root)?;
+            unpack_package(&output_path, fake_root);
 
             let metadata_path = fake_root.join(".PKGINFO");
 
@@ -213,12 +213,13 @@ pub fn install_pkg(
 
                 for dep in package1.dependencies {
                     let dep_name = dep.split(&['<', '>', '=', ' '][..]).next().unwrap();
-                    install_pkg(&dep_name, visited)?;
+                    install_pkg(index, dep_name, visited)?;
                 }
             } else {
                 println!("Package installed successfully (no metadata.pkg found).");
             }
             let _ = fs::remove_file(output_path);
+            mark_installed(package_name)?;
         }
 
         None => {
