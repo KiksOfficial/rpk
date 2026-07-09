@@ -173,10 +173,11 @@ pub fn is_installed(pkg: &str) -> bool {
         .exists()
 }
 
-pub fn mark_installed(pkg: &str) -> std::io::Result<()> {
-    let dir = Path::new("/home/kiks/Proge/fake-root/var/lib/rpk_db");
-    create_dir_all(dir)?;
-    write(dir.join(pkg), "")
+pub fn mark_installed(pkg: &str, files: Vec<String>) -> std::io::Result<()> {
+    let dir = Path::new("/home/kiks/Proge/fake-root/var/lib/rpk_db").join(pkg);
+    create_dir_all(&dir)?;
+    //let contents = installed_files
+    write(dir.join("files.txt"), files.join("\n"))
 }
 
 pub fn install_pkg(
@@ -203,7 +204,10 @@ pub fn install_pkg(
 
             let fake_root = Path::new("/home/kiks/Proge/fake-root");
             println!("Unpacking to fake-root...");
-            unpack_package(&output_path, fake_root);
+            let files = match unpack_package(&output_path, fake_root) {
+                Ok(files) => files,
+                Err(e) => return Err(std::io::Error::new(std::io::ErrorKind::Other, e)),
+            };
 
             let metadata_path = fake_root.join(".PKGINFO");
 
@@ -219,7 +223,7 @@ pub fn install_pkg(
                 println!("Package installed successfully (no metadata.pkg found).");
             }
             let _ = fs::remove_file(output_path);
-            mark_installed(package_name)?;
+            mark_installed(package_name, files);
         }
 
         None => {

@@ -3,21 +3,43 @@ use std::io::{self, Write};
 use std::path::Path;
 use std::process::Command;
 
-pub fn unpack_package(src_path: &Path, dest_path: &Path) -> Result<(), String> {
-    let unpack = Command::new("tar")
+pub fn unpack_package(src_path: &Path, dest_path: &Path) -> Result<Vec<String>, String> {
+    let output = Command::new("tar")
+        .args(["-tf", src_path.to_str().ok_or("Invalid source path")?])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err("Failed to list archive contents".to_string());
+    }
+
+    let mut files = String::from_utf8(output.stdout)
+        .map_err(|e| e.to_string())?
+        .lines()
+        .filter_map(|p| {
+            if p.starts_with('.') || p.ends_with('/') || p.is_empty() {
+                None
+            } else {
+                Some(p.to_owned())
+            }
+        })
+        .collect::<Vec<_>>();
+    files.sort();
+    let status = Command::new("tar")
         .args([
             "-xf",
-            src_path.to_str().ok_or("Src path does not exist")?,
+            src_path.to_str().ok_or("Invalid source path")?,
             "-C",
-            dest_path.to_str().ok_or("Dest path does not exist")?,
+            dest_path.to_str().ok_or("Invalid destination path")?,
         ])
         .status()
         .map_err(|e| e.to_string())?;
-    if unpack.success() {
-        Ok(())
-    } else {
-        Err("Failed to unpack".to_string())
+
+    if !status.success() {
+        return Err("Failed to unpack archive".to_string());
     }
+
+    Ok(files)
 }
 
 pub fn register_pkg(name: &str, version: &str, desc: &str, files: &[String]) -> io::Result<()> {

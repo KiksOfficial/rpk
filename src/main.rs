@@ -2,10 +2,12 @@ mod commands;
 mod filesystem;
 mod package;
 
-use commands::install::{build_repos_hashmap, download_file, get_link, install_pkg, pkg_info};
+use commands::install::{build_repos_hashmap, install_pkg};
 use commands::update_mirrors::update_mirrors;
 use std::collections::{HashMap, HashSet};
 use std::env::args;
+
+use crate::commands::remove::remove_package;
 
 pub fn run_install(args: Vec<String>) -> std::io::Result<()> {
     let mut visited = HashSet::new();
@@ -37,6 +39,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let _ = update_mirrors();
     } else if operation == "-S" {
         run_install(argumendid);
+    } else if operation == "-R" {
+        remove_package(&argumendid[2]);
     }
 
     Ok(())
