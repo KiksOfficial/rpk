@@ -176,7 +176,6 @@ pub fn is_installed(pkg: &str) -> bool {
 pub fn mark_installed(pkg: &str, files: Vec<String>) -> std::io::Result<()> {
     let dir = Path::new("/home/kiks/Proge/fake-root/var/lib/rpk_db").join(pkg);
     create_dir_all(&dir)?;
-    //let contents = installed_files
     write(dir.join("files.txt"), files.join("\n"))
 }
 

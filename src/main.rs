@@ -38,9 +38,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if operation == "-Sy" {
         let _ = update_mirrors();
     } else if operation == "-S" {
-        run_install(argumendid);
+        let _ = run_install(argumendid);
     } else if operation == "-R" {
-        remove_package(&argumendid[2]);
+        for arg in argumendid {
+            let _ = remove_package(&arg);
+        }
     }
 
     Ok(())
