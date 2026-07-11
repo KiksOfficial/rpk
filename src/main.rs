@@ -33,15 +33,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Incorrect format (use rpk [option] [package])");
         return Ok(());
     }
-
+    println!("{:?}", &argumendid);
     let operation = &argumendid[1];
-    if operation == "-Sy" {
-        let _ = update_mirrors();
-    } else if operation == "-S" {
-        let _ = run_install(argumendid);
-    } else if operation == "-R" {
-        for arg in argumendid {
-            let _ = remove_package(&arg);
+
+    match operation.as_str() {
+        "-Sy" => update_mirrors()?,
+        "-S" => run_install(argumendid)?,
+        "-R" => {
+            for arg in argumendid.iter().skip(2) {
+                match remove_package(&arg) {
+                    Ok(()) => {}
+                    Err(e) => eprintln!("{}", e),
+                }
+            }
+        }
+        _ => {
+            eprintln!("Command not found")
         }
     }
 

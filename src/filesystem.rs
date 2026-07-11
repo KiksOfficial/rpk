@@ -42,7 +42,7 @@ pub fn unpack_package(src_path: &Path, dest_path: &Path) -> Result<Vec<String>, 
     Ok(files)
 }
 
-pub fn register_pkg(name: &str, version: &str, desc: &str, files: &[String]) -> io::Result<()> {
+/*pub fn register_pkg(name: &str, version: &str, desc: &str, files: &[String]) -> io::Result<()> {
     let db_dir = Path::new("/home/kiks/Proge/fake-root/local-db").join(name);
     if !db_dir.exists() {
         create_dir(&db_dir)?;
@@ -59,4 +59,4 @@ pub fn register_pkg(name: &str, version: &str, desc: &str, files: &[String]) -> 
         writeln!(files_file, "{}", file_path)?;
     }
     Ok(())
-}
+}*/

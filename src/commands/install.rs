@@ -1,12 +1,6 @@
-use crate::filesystem::register_pkg;
 use crate::filesystem::unpack_package;
 use std::collections::{HashMap, HashSet};
-use std::fmt::format;
-use std::fs;
-use std::fs::create_dir_all;
-use std::fs::read_dir;
-use std::fs::read_to_string;
-use std::fs::write;
+use std::fs::{self, create_dir_all, read_dir, read_to_string, write};
 use std::io;
 use std::path::Path;
 use std::process::Command;

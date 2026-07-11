@@ -3,7 +3,7 @@ use std::io;
 use std::{fs, path::Path};
 
 pub fn remove_package(pkg_name: &str) -> io::Result<()> {
-    let files_txt_path = Path::new("/home/kiks/Proge/fake-root/local-db")
+    let files_txt_path = Path::new("/home/kiks/Proge/fake-root/var/lib/rpk_db")
         .join(pkg_name)
         .join("files.txt");
     let sisu = fs::read_to_string(files_txt_path)?;
@@ -20,12 +20,12 @@ pub fn remove_package(pkg_name: &str) -> io::Result<()> {
         }
     }
 
-    let db_folder = Path::new("/home/kiks/Proge/fake-root/local-db").join(pkg_name);
+    let db_folder = Path::new("/home/kiks/Proge/fake-root/var/lib/rpk_db").join(pkg_name);
     if db_folder.exists() {
         remove_dir_all(db_folder)?;
-    }
 
-    println!("Package {} has been deleted", &pkg_name);
+        println!("Package {} has been deleted", &pkg_name);
+    }
 
     Ok(())
 }
