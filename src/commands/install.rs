@@ -1,4 +1,4 @@
-use crate::filesystem::unpack_package;
+use crate::filesystem::{read_pkg_info, unpack_package};
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, create_dir_all, read_dir, read_to_string, write};
 use std::io;
@@ -60,16 +60,17 @@ pub struct Package {
     Ok(package)
 }*/
 
-pub fn pkg_info(path: &Path) -> io::Result<Package> {
-    let contents = fs::read_to_string(path)?;
-
+pub fn parse_pkg_info(text: &str) -> io::Result<Package> {
     let mut name = String::new();
     let mut version = String::new();
     let mut dependencies = Vec::new();
     let mut soname_dependencies = Vec::new();
 
-    for line in contents.lines() {
-        if let Some((key, value)) = line.split_once(" = ") {
+    for line in text.lines() {
+        if let Some((key, value)) = line.split_once('=') {
+            let key = key.trim();
+            let value = value.trim();
+
             match key {
                 "pkgname" => name = value.to_string(),
                 "pkgver" => version = value.to_string(),
@@ -186,8 +187,7 @@ pub fn install_pkg(
         return Ok(());
     }
 
-    let link_found = get_link(index, package_name);
-    match link_found {
+    match get_link(index, package_name) {
         Some(pkg_link) => {
             let file_name = format!("{}.tar.zst", package_name);
             let output_path = Path::new("/tmp").join(&file_name);
@@ -195,28 +195,28 @@ pub fn install_pkg(
             println!("Downloading {}...", package_name);
             download_file(&pkg_link, &output_path)?;
 
-            let fake_root = Path::new("/home/kiks/Proge/fake-root");
-            println!("Unpacking to fake-root...");
-            let files = match unpack_package(&output_path, fake_root) {
-                Ok(files) => files,
-                Err(e) => return Err(std::io::Error::new(std::io::ErrorKind::Other, e)),
-            };
+            let pkg_meta_contents =
+                read_pkg_info(&output_path).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
 
-            let metadata_path = fake_root.join(".PKGINFO");
+            let package = parse_pkg_info(&pkg_meta_contents)?;
 
-            if metadata_path.exists() {
-                let package1 = pkg_info(&metadata_path)?;
-                println!("{:?}", &package1);
+            println!("{:?}", &package);
 
-                for dep in package1.dependencies {
-                    let dep_name = dep.split(&['<', '>', '=', ' '][..]).next().unwrap();
-                    install_pkg(index, dep_name, visited)?;
-                }
-            } else {
-                println!("Package installed successfully (no metadata.pkg found).");
+            for dep in package.dependencies {
+                let dep_name = dep.split(&['<', '>', '=', ' '][..]).next().unwrap();
+
+                install_pkg(index, dep_name, visited)?;
             }
-            let _ = fs::remove_file(output_path);
+
+            let fake_root = Path::new("/home/kiks/Proge/fake-root");
+
+            println!("Unpacking to fake-root...");
+            let files = unpack_package(&output_path, fake_root)
+                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
             mark_installed(package_name, files);
+
+            let _ = fs::remove_file(output_path);
         }
 
         None => {

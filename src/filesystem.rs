@@ -42,6 +42,20 @@ pub fn unpack_package(src_path: &Path, dest_path: &Path) -> Result<Vec<String>, 
     Ok(files)
 }
 
+pub fn read_pkg_info(src_path: &Path) -> Result<String, String> {
+    let status = Command::new("tar")
+        .args([
+            "--zstd",
+            "xOf",
+            src_path.to_str().ok_or("Invalid src path")?,
+            ".PKGINFO",
+        ])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    String::from_utf8(status.stdout).map_err(|e| e.to_string())
+}
+
 /*pub fn register_pkg(name: &str, version: &str, desc: &str, files: &[String]) -> io::Result<()> {
     let db_dir = Path::new("/home/kiks/Proge/fake-root/local-db").join(name);
     if !db_dir.exists() {
