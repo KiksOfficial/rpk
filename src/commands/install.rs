@@ -115,46 +115,69 @@ pub fn download_file(url: &str, output_path: &Path) -> io::Result<()> {
         ))
     }
 }
-pub fn build_repos_hashmap(
-    repo: &str,
-    index: &mut HashMap<String, (String, String)>,
-) -> io::Result<()> {
+pub fn build_repos_hashmap(repo: &str) -> io::Result<HashMap<String, (String, String, String)>> {
+    let mut index = HashMap::new();
     let db_dir = Path::new("/tmp/mirror_list").join(format!("{}_db", repo));
+
+    println!("Reading {:?}", db_dir);
+
+    if !db_dir.exists() {
+        println!("Directory does not exist!");
+    }
     for entry in read_dir(db_dir)? {
         let entry = entry?.path();
+
+        println!("Found entry: {:?}", entry);
+
         let desc = entry.join("desc");
 
-        if !desc.exists() {
-            continue;
-        }
+        println!("Checking desc: {:?}", desc);
+
+        let contents = match read_to_string(&desc) {
+            Ok(v) => v,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => continue,
+            Err(e) => return Err(e),
+        };
 
         let mut name = None;
         let mut filename = None;
         let mut section = "";
+        let mut version = None;
+
+        println!("REadoing desc");
 
         for line in read_to_string(&desc)?.lines() {
             match line {
                 "%NAME%" => section = "%NAME%",
                 "%FILENAME%" => section = "%FILENAME%",
+                "%VERSION%" => section = "%VERSION%",
                 _ => match section {
                     "%NAME%" if name.is_none() => name = Some(line.to_owned()),
 
                     "%FILENAME%" if filename.is_none() => filename = Some(line.to_owned()),
+
+                    "%VERSION%" if version.is_none() => version = Some(line.to_owned()),
                     _ => {}
                 },
             }
-            if name.is_some() && filename.is_some() {
+            if name.is_some() && filename.is_some() && version.is_some() {
                 break;
             }
         }
-        if let (Some(name), Some(filename)) = (name, filename) {
-            index.insert(name, (repo.to_string(), filename));
+        if let (Some(name), Some(filename), Some(version)) = (name, filename, version) {
+            println!("Loaded {}", name);
+            index.insert(name, (repo.to_string(), filename, version));
         }
+
+        println!("{} loaded packages from {}", index.len(), repo);
     }
-    Ok(())
+    Ok(index)
 }
-pub fn get_link(index: &HashMap<String, (String, String)>, pkg_name: &str) -> Option<String> {
-    index.get(pkg_name).map(|(repo, filename)| {
+pub fn get_link(
+    index: &HashMap<String, (String, String, String)>,
+    pkg_name: &str,
+) -> Option<String> {
+    index.get(pkg_name).map(|(repo, filename, _version)| {
         format!(
             "https://mirrors.kernel.org/archlinux/{}/os/x86_64/{}",
             repo, filename
@@ -168,22 +191,27 @@ pub fn is_installed(pkg: &str) -> bool {
         .exists()
 }
 
-pub fn mark_installed(pkg: &str, files: Vec<String>) -> std::io::Result<()> {
+pub fn mark_installed(pkg: &str, version: &str, files: Vec<String>) -> std::io::Result<()> {
     let dir = Path::new("/home/kiks/Proge/fake-root/var/lib/rpk_db").join(pkg);
-    create_dir_all(&dir)?;
-    write(dir.join("files.txt"), files.join("\n"))
-}
 
+    create_dir_all(&dir)?;
+
+    write(dir.join("version.txt"), version)?;
+    write(dir.join("files.txt"), files.join("\n"))?;
+
+    Ok(())
+}
 pub fn install_pkg(
-    index: &HashMap<String, (String, String)>,
+    index: &HashMap<String, (String, String, String)>,
     package_name: &str,
     visited: &mut HashSet<String>,
+    force: bool,
 ) -> io::Result<()> {
     if !visited.insert(package_name.to_string()) {
         return Ok(());
     }
 
-    if is_installed(package_name) {
+    if is_installed(package_name) && !force {
         return Ok(());
     }
 
@@ -193,6 +221,7 @@ pub fn install_pkg(
             let output_path = Path::new("/tmp").join(&file_name);
 
             println!("Downloading {}...", package_name);
+
             download_file(&pkg_link, &output_path)?;
 
             let pkg_meta_contents =
@@ -200,23 +229,22 @@ pub fn install_pkg(
 
             let package = parse_pkg_info(&pkg_meta_contents)?;
 
-            println!("{:?}", &package);
-
-            for dep in package.dependencies {
+            for dep in &package.dependencies {
                 let dep_name = dep.split(&['<', '>', '=', ' '][..]).next().unwrap();
 
-                install_pkg(index, dep_name, visited)?;
+                install_pkg(index, dep_name, visited, force)?;
             }
 
             let fake_root = Path::new("/home/kiks/Proge/fake-root");
 
-            println!("Unpacking to fake-root...");
+            println!("Unpacking {}...", package_name);
+
             let files = unpack_package(&output_path, fake_root)
                 .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
 
-            mark_installed(package_name, files);
+            mark_installed(package_name, &package.version, files)?;
 
-            let _ = fs::remove_file(output_path);
+            fs::remove_file(output_path)?;
         }
 
         None => {

@@ -43,17 +43,21 @@ pub fn unpack_package(src_path: &Path, dest_path: &Path) -> Result<Vec<String>, 
 }
 
 pub fn read_pkg_info(src_path: &Path) -> Result<String, String> {
-    let status = Command::new("tar")
+    let output = Command::new("tar")
         .args([
-            "--zstd",
-            "xOf",
+            "-xOf",
             src_path.to_str().ok_or("Invalid src path")?,
             ".PKGINFO",
+            "--zstd",
         ])
         .output()
         .map_err(|e| e.to_string())?;
 
-    String::from_utf8(status.stdout).map_err(|e| e.to_string())
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).into_owned());
+    }
+
+    String::from_utf8(output.stdout).map_err(|e| e.to_string())
 }
 
 /*pub fn register_pkg(name: &str, version: &str, desc: &str, files: &[String]) -> io::Result<()> {
