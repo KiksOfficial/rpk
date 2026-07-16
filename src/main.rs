@@ -4,7 +4,7 @@ mod package;
 
 use commands::install::{build_repos_hashmap, install_pkg, parse_pkg_info};
 use commands::update_mirrors::update_mirrors;
-use commands::update_packages::{get_installed_packages, get_installed_version};
+use commands::update_packages::{get_installed_packages, get_installed_version, update_pkg};
 use std::collections::{HashMap, HashSet};
 use std::env::args;
 
@@ -64,8 +64,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             repo_version
                         );
 
-                        let mut visited = HashSet::new();
-                        install_pkg(&index, &pkg_name, &mut visited, true)?;
+                        update_pkg(&index, &pkg_name)?;
                     }
                 }
             }

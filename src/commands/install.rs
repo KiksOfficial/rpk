@@ -119,32 +119,18 @@ pub fn build_repos_hashmap(repo: &str) -> io::Result<HashMap<String, (String, St
     let mut index = HashMap::new();
     let db_dir = Path::new("/tmp/mirror_list").join(format!("{}_db", repo));
 
-    println!("Reading {:?}", db_dir);
-
     if !db_dir.exists() {
         println!("Directory does not exist!");
     }
     for entry in read_dir(db_dir)? {
         let entry = entry?.path();
 
-        println!("Found entry: {:?}", entry);
-
         let desc = entry.join("desc");
-
-        println!("Checking desc: {:?}", desc);
-
-        let contents = match read_to_string(&desc) {
-            Ok(v) => v,
-            Err(e) if e.kind() == io::ErrorKind::NotFound => continue,
-            Err(e) => return Err(e),
-        };
 
         let mut name = None;
         let mut filename = None;
         let mut section = "";
         let mut version = None;
-
-        println!("REadoing desc");
 
         for line in read_to_string(&desc)?.lines() {
             match line {
@@ -165,11 +151,8 @@ pub fn build_repos_hashmap(repo: &str) -> io::Result<HashMap<String, (String, St
             }
         }
         if let (Some(name), Some(filename), Some(version)) = (name, filename, version) {
-            println!("Loaded {}", name);
             index.insert(name, (repo.to_string(), filename, version));
         }
-
-        println!("{} loaded packages from {}", index.len(), repo);
     }
     Ok(index)
 }
