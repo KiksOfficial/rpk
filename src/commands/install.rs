@@ -16,50 +16,6 @@ pub struct Package {
     pub soname_dependencies: Vec<String>,
 }
 
-/*pub fn read_metadata(path: &Path) -> io::Result<Package> {
-    let contents = fs::read_to_string(path)?;
-    let mut file_name = String::new();
-    let mut name = String::new();
-    let mut version = String::new();
-    let mut dependencies: Vec<String> = Vec::new();
-    let mut files: Vec<String> = Vec::new();
-    let mut current = String::new();
-    let mut soname_dependencies = Vec::new();
-
-    println!("{}", &contents);
-    for line in contents.lines() {
-        let trimmed = line.trim();
-        if trimmed.is_empty() || trimmed.starts_with('#') {
-            continue;
-        }
-
-        if trimmed.starts_with('%') && trimmed.ends_with('%') {
-            current = trimmed.to_string();
-        } else {
-            match current.as_str() {
-                "%NAME%" => name = trimmed.to_string(),
-                "%FILENAME%" => file_name = trimmed.to_string(),
-                "%VERSION%" => version = trimmed.to_string(),
-                "%DEPENDS%" => dependencies.push(trimmed.to_string()),
-                "%FILES%" => files.push(trimmed.to_string()),
-                _ => {}
-            }
-        }
-    }
-
-    let package = Package {
-        name,
-        file_name,
-        version,
-        dependencies,
-        files,
-        soname_dependencies,
-    };
-
-    println!("{:?}", &package);
-    Ok(package)
-}*/
-
 pub fn parse_pkg_info(text: &str) -> io::Result<Package> {
     let mut name = String::new();
     let mut version = String::new();
