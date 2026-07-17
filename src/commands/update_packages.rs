@@ -60,7 +60,7 @@ pub fn update_pkg(
             let files = unpack_package(&output_path, fake_root)
                 .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
 
-            mark_installed(package_name, &package.version, files)?;
+            mark_installed(package_name, &package.version, files, package.dependencies)?;
 
             fs::remove_file(output_path)?;
         }

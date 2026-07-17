@@ -33,10 +33,10 @@ pub fn parse_pkg_info(text: &str) -> io::Result<Package> {
                 "depend" => {
                     if value.contains(".so=") {
                         soname_dependencies.push(value.to_string());
-                    } else if value.contains(">=") {
-                        continue;
                     } else {
-                        dependencies.push(value.to_string());
+                        let dep = value.split(['<', '>', '=']).next().unwrap().trim();
+
+                        dependencies.push(dep.to_string());
                     }
                 }
                 _ => {}
@@ -130,13 +130,26 @@ pub fn is_installed(pkg: &str) -> bool {
         .exists()
 }
 
-pub fn mark_installed(pkg: &str, version: &str, files: Vec<String>) -> std::io::Result<()> {
+pub fn mark_installed(
+    pkg: &str,
+    version: &str,
+    files: Vec<String>,
+    depends: Vec<String>,
+) -> std::io::Result<()> {
     let dir = Path::new("/home/kiks/Proge/fake-root/var/lib/rpk_db").join(pkg);
 
     create_dir_all(&dir)?;
 
     write(dir.join("version.txt"), version)?;
     write(dir.join("files.txt"), files.join("\n"))?;
+
+    println!("writing {:?} to {:?}", depends, dir.join("depends"));
+    write(dir.join("depends"), depends.join("\n"))?;
+
+    println!(
+        "after write: {:?}",
+        std::fs::read_to_string(dir.join("depends"))?
+    );
 
     Ok(())
 }
@@ -167,6 +180,7 @@ pub fn install_pkg(
                 read_pkg_info(&output_path).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
 
             let package = parse_pkg_info(&pkg_meta_contents)?;
+            println!("{:?}", &package);
 
             for dep in &package.dependencies {
                 let dep_name = dep.split(&['<', '>', '=', ' '][..]).next().unwrap();
@@ -181,7 +195,14 @@ pub fn install_pkg(
             let files = unpack_package(&output_path, fake_root)
                 .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
 
-            mark_installed(package_name, &package.version, files)?;
+            let depends = package.dependencies;
+
+            mark_installed(package_name, &package.version, files, depends)?;
+
+            println!(
+                "caller sees: {:?}",
+                std::fs::read_to_string("/home/kiks/Proge/fake-root/var/lib/rpk_db/htop/depends")?
+            );
 
             fs::remove_file(output_path)?;
         }
