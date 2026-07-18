@@ -143,8 +143,13 @@ pub fn mark_installed(
     write(dir.join("version.txt"), version)?;
     write(dir.join("files.txt"), files.join("\n"))?;
 
-    println!("writing {:?} to {:?}", depends, dir.join("depends"));
-    write(dir.join("depends"), depends.join("\n"))?;
+    let mut depends_content = String::new();
+
+    for dep in depends {
+        depends_content.push_str(dep);
+        depends_content.push_str("\n")
+
+    write(dir.join("depends"), depends_content)?;
 
     println!(
         "after write: {:?}",
