@@ -1,7 +1,8 @@
 use crate::filesystem::{read_pkg_info, unpack_package};
 use std::collections::{HashMap, HashSet};
+use std::fs::OpenOptions;
 use std::fs::{self, create_dir_all, read_dir, read_to_string, write};
-use std::io;
+use std::io::{self, Write};
 use std::path::Path;
 use std::process::Command;
 
@@ -125,9 +126,12 @@ pub fn get_link(
 }
 
 pub fn is_installed(pkg: &str) -> bool {
-    Path::new("/home/kiks/Proge/fake-root/var/lib/rpk_db")
-        .join(pkg)
-        .exists()
+    if let Ok(db) = read_to_string("/home/kiks/Proge/fake-root/var/lib/rpk_db.txt") {
+        db.lines()
+            .any(|line| line.starts_with(&format!("{} -", pkg)))
+    } else {
+        false
+    }
 }
 
 pub fn mark_installed(
@@ -136,25 +140,22 @@ pub fn mark_installed(
     files: Vec<String>,
     depends: Vec<String>,
 ) -> std::io::Result<()> {
-    let dir = Path::new("/home/kiks/Proge/fake-root/var/lib/rpk_db").join(pkg);
+    let lib_dir = Path::new("/home/kiks/Proge/fake-root/var/lib");
+    let files_dir = lib_dir.join("rpk_files").join(pkg);
+    let db_path = lib_dir.join("rpk_db.txt");
 
-    create_dir_all(&dir)?;
+    create_dir_all(&files_dir)?;
 
-    write(dir.join("version.txt"), version)?;
-    write(dir.join("files.txt"), files.join("\n"))?;
+    write(files_dir.join("files.txt"), files.join("\n"))?;
 
-    let mut depends_content = String::new();
+    write(files_dir.join("version.txt"), version)?;
 
-    for dep in depends {
-        depends_content.push_str(dep);
-        depends_content.push_str("\n")
+    let mut db = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&db_path)?;
 
-    write(dir.join("depends"), depends_content)?;
-
-    println!(
-        "after write: {:?}",
-        std::fs::read_to_string(dir.join("depends"))?
-    );
+    writeln!(db, "{}:{}", pkg, depends.join(","))?;
 
     Ok(())
 }
@@ -196,6 +197,8 @@ pub fn install_pkg(
             let fake_root = Path::new("/home/kiks/Proge/fake-root");
 
             println!("Unpacking {}...", package_name);
+            println!("archive path: {:?}", output_path);
+            println!("archive exists: {}", output_path.exists());
 
             let files = unpack_package(&output_path, fake_root)
                 .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
@@ -203,11 +206,6 @@ pub fn install_pkg(
             let depends = package.dependencies;
 
             mark_installed(package_name, &package.version, files, depends)?;
-
-            println!(
-                "caller sees: {:?}",
-                std::fs::read_to_string("/home/kiks/Proge/fake-root/var/lib/rpk_db/htop/depends")?
-            );
 
             fs::remove_file(output_path)?;
         }

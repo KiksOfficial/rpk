@@ -8,6 +8,19 @@ pub fn remove_package(pkg_name: &str) -> io::Result<()> {
         .join("files.txt");
     let sisu = fs::read_to_string(files_txt_path)?;
 
+    let mut depends = Vec::new();
+
+    let deps_file = Path::new("/home/kiks/Proge/fake-root/var/lib/rpk_db")
+        .join(pkg_name)
+        .join("depends");
+    let sisu_deps = fs::read_to_string(deps_file)?;
+
+    for dep in sisu_deps.lines() {
+        depends.push(dep);
+    }
+
+    println!("{:?}", &depends);
+
     for rida in sisu.lines() {
         let package_location = Path::new("/home/kiks/Proge/fake-root/").join(rida);
         if package_location.exists() {
@@ -26,6 +39,5 @@ pub fn remove_package(pkg_name: &str) -> io::Result<()> {
 
         println!("Package {} has been deleted", &pkg_name);
     }
-
     Ok(())
 }
