@@ -126,11 +126,13 @@ pub fn get_link(
 }
 
 pub fn is_installed(pkg: &str) -> bool {
-    if let Ok(db) = read_to_string("/home/kiks/Proge/fake-root/var/lib/rpk_db.txt") {
-        db.lines()
-            .any(|line| line.starts_with(&format!("{} -", pkg)))
-    } else {
-        false
+    match read_to_string("/home/kiks/Proge/fake-root/var/lib/rpk_db.txt") {
+        Ok(db) => db.lines().any(|line| {
+            line.split_once(':')
+                .map(|(name, _)| name == pkg)
+                .unwrap_or(false)
+        }),
+        Err(_) => false,
     }
 }
 
@@ -139,7 +141,7 @@ pub fn mark_installed(
     version: &str,
     files: Vec<String>,
     depends: Vec<String>,
-) -> std::io::Result<()> {
+) -> io::Result<()> {
     let lib_dir = Path::new("/home/kiks/Proge/fake-root/var/lib");
     let files_dir = lib_dir.join("rpk_files").join(pkg);
     let db_path = lib_dir.join("rpk_db.txt");
@@ -150,12 +152,21 @@ pub fn mark_installed(
 
     write(files_dir.join("version.txt"), version)?;
 
-    let mut db = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&db_path)?;
+    let mut entries = if db_path.exists() {
+        read_to_string(&db_path)?
+            .lines()
+            .filter(|line| !line.starts_with(&format!("{}:", pkg)))
+            .map(String::from)
+            .collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
 
-    writeln!(db, "{}:{}", pkg, depends.join(","))?;
+    entries.push(format!("{}:{}", pkg, depends.join(",")));
+
+    write(db_path, entries.join("\n") + "\n")?;
+
+    println!("Recording {} dependencies: {:?}", pkg, depends);
 
     Ok(())
 }
@@ -165,11 +176,12 @@ pub fn install_pkg(
     visited: &mut HashSet<String>,
     force: bool,
 ) -> io::Result<()> {
-    if !visited.insert(package_name.to_string()) {
+    if is_installed(package_name) && !force {
+        println!("{} already installed", package_name);
         return Ok(());
     }
 
-    if is_installed(package_name) && !force {
+    if !visited.insert(package_name.to_string()) {
         return Ok(());
     }
 
@@ -205,8 +217,9 @@ pub fn install_pkg(
 
             let depends = package.dependencies;
 
-            mark_installed(package_name, &package.version, files, depends)?;
-
+            if !files.is_empty() {
+                mark_installed(package_name, &package.version, files, depends)?;
+            }
             fs::remove_file(output_path)?;
         }
 

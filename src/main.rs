@@ -8,8 +8,6 @@ use commands::update_packages::{get_installed_packages, get_installed_version, u
 use std::collections::{HashMap, HashSet};
 use std::env::args;
 
-use crate::commands::remove::remove_package;
-
 pub fn run_install(args: Vec<String>) -> std::io::Result<()> {
     let mut visited = HashSet::new();
     let core = build_repos_hashmap("core")?;
@@ -18,6 +16,8 @@ pub fn run_install(args: Vec<String>) -> std::io::Result<()> {
     index.extend(extra);
     println!("Loaded {} packages", &index.len());
     for package in args.iter().skip(2) {
+        println!("Trying to install: {}", package);
+        println!("{:?}", index.get("htop"));
         match install_pkg(&index, package, &mut visited, false) {
             Ok(()) => {}
             Err(e) => {
@@ -70,10 +70,46 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         "-R" => {
+            use crate::commands::remove::{
+                build_dependency_hashmap, build_reverse_hashmap, remove_package_recursive,
+            };
+            use std::collections::HashSet;
+            use std::path::Path;
+
+            let db = Path::new("/home/kiks/Proge/fake-root/var/lib/rpk_db.txt");
+
+            println!("Loading DB: {:?}", db);
+
+            let dependencies = match build_dependency_hashmap(db) {
+                Ok(x) => {
+                    println!("Dependency DB loaded");
+                    x
+                }
+                Err(e) => {
+                    eprintln!("Dependency DB failed: {}", e);
+                    return Ok(());
+                }
+            };
+
+            let reverse = match build_reverse_hashmap(db) {
+                Ok(x) => {
+                    println!("Reverse DB loaded");
+                    x
+                }
+                Err(e) => {
+                    eprintln!("Reverse DB failed: {}", e);
+                    return Ok(());
+                }
+            };
+
+            let mut removed = HashSet::new();
+
             for arg in argumendid.iter().skip(2) {
-                match remove_package(&arg) {
-                    Ok(()) => {}
-                    Err(e) => eprintln!("{}", e),
+                println!("Removing {}", arg);
+
+                if let Err(e) = remove_package_recursive(arg, &dependencies, &reverse, &mut removed)
+                {
+                    eprintln!("Remove failed: {}", e);
                 }
             }
         }
