@@ -207,8 +207,6 @@ pub fn install_pkg(
             let fake_root = Path::new("/home/kiks/Proge/fake-root");
 
             println!("Unpacking {}...", package_name);
-            println!("archive path: {:?}", output_path);
-            println!("archive exists: {}", output_path.exists());
 
             let files = unpack_package(&output_path, fake_root).map_err(std::io::Error::other)?;
 
