@@ -1,21 +1,19 @@
-use crate::commands::install::{
-    download_file, get_link, is_installed, mark_installed, parse_pkg_info,
-};
+use crate::commands::install::{download_file, get_link, mark_installed, parse_pkg_info};
 use crate::filesystem::{read_pkg_info, unpack_package};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fs::{self, read_dir};
 use std::io;
 use std::path::Path;
 
 pub fn get_installed_version(pkg_name: &str) -> io::Result<String> {
-    let pkg_path = Path::new("/home/kiks/Proge/fake-root/var/lib/rpk_db")
+    let pkg_path = Path::new("/home/kiks/Proge/fake-root/var/lib/rpk_files")
         .join(pkg_name)
         .join("version.txt");
     fs::read_to_string(pkg_path)
 }
 
 pub fn get_installed_packages() -> io::Result<Vec<String>> {
-    let db = Path::new("/home/kiks/Proge/fake-root/var/lib/rpk_db");
+    let db = Path::new("/home/kiks/Proge/fake-root/var/lib/rpk_files");
 
     if !db.exists() {
         return Ok(Vec::new());
@@ -25,10 +23,10 @@ pub fn get_installed_packages() -> io::Result<Vec<String>> {
 
     for entry in read_dir(db)? {
         let entry = entry?;
-        if entry.path().is_dir() {
-            if let Some(name) = entry.file_name().to_str() {
-                packages.push(name.to_string());
-            }
+        if entry.path().is_dir()
+            && let Some(name) = entry.file_name().to_str()
+        {
+            packages.push(name.to_string());
         }
     }
 
@@ -48,8 +46,7 @@ pub fn update_pkg(
 
             download_file(&pkg_link, &output_path)?;
 
-            let pkg_meta_contents =
-                read_pkg_info(&output_path).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+            let pkg_meta_contents = read_pkg_info(&output_path).map_err(io::Error::other)?;
 
             let package = parse_pkg_info(&pkg_meta_contents)?;
 
@@ -57,8 +54,7 @@ pub fn update_pkg(
 
             println!("Unpacking {}...", package_name);
 
-            let files = unpack_package(&output_path, fake_root)
-                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+            let files = unpack_package(&output_path, fake_root).map_err(io::Error::other)?;
 
             mark_installed(package_name, &package.version, files, package.dependencies)?;
 

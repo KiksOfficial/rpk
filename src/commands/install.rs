@@ -1,8 +1,7 @@
 use crate::filesystem::{read_pkg_info, unpack_package};
 use std::collections::{HashMap, HashSet};
-use std::fs::OpenOptions;
 use std::fs::{self, create_dir_all, read_dir, read_to_string, write};
-use std::io::{self, Write};
+use std::io::{self};
 use std::path::Path;
 use std::process::Command;
 
@@ -61,15 +60,15 @@ pub fn download_file(url: &str, output_path: &Path) -> io::Result<()> {
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "incorrect file path"))?;
 
     let status = Command::new("curl")
-        .args(&["-fsSL", "-o", path_str, url])
+        .args(["-fsSL", "-o", path_str, url])
         .status()?;
     if status.success() {
         Ok(())
     } else {
-        Err(io::Error::new(
-            io::ErrorKind::Other,
-            format!("curl gave an error: {:?}", status.code()),
-        ))
+        Err(io::Error::other(format!(
+            "curl gave an error: {:?}",
+            status.code()
+        )))
     }
 }
 pub fn build_repos_hashmap(repo: &str) -> io::Result<HashMap<String, (String, String, String)>> {
@@ -194,8 +193,7 @@ pub fn install_pkg(
 
             download_file(&pkg_link, &output_path)?;
 
-            let pkg_meta_contents =
-                read_pkg_info(&output_path).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+            let pkg_meta_contents = read_pkg_info(&output_path).map_err(io::Error::other)?;
 
             let package = parse_pkg_info(&pkg_meta_contents)?;
             println!("{:?}", &package);
@@ -212,8 +210,7 @@ pub fn install_pkg(
             println!("archive path: {:?}", output_path);
             println!("archive exists: {}", output_path.exists());
 
-            let files = unpack_package(&output_path, fake_root)
-                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+            let files = unpack_package(&output_path, fake_root).map_err(std::io::Error::other)?;
 
             let depends = package.dependencies;
 

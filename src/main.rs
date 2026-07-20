@@ -1,11 +1,10 @@
 mod commands;
 mod filesystem;
-mod package;
 
-use commands::install::{build_repos_hashmap, install_pkg, parse_pkg_info};
+use commands::install::{build_repos_hashmap, install_pkg};
 use commands::update_mirrors::update_mirrors;
 use commands::update_packages::{get_installed_packages, get_installed_version, update_pkg};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::env::args;
 
 pub fn run_install(args: Vec<String>) -> std::io::Result<()> {
@@ -49,6 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             index.extend(extra);
 
             let installed = get_installed_packages()?;
+            println!("{:?}", &installed);
 
             println!("Installed packages loaded: {}", &installed.len());
 

@@ -74,7 +74,6 @@ pub fn remove_package_files(pkg_name: &str) -> io::Result<()> {
 
         if path.is_file() {
             remove_file(&path)?;
-            //println!("Deleted file: {:?}", path);
         } else if path.is_dir() {
             let _ = remove_dir(&path);
         }
@@ -98,8 +97,33 @@ pub fn remove_package_recursive(
     removed: &mut HashSet<String>,
 ) -> io::Result<()> {
     println!("Entering remove_package_recursive({})", pkg_name);
-    
+
     if removed.contains(pkg_name) {
+        return Ok(());
+    }
+
+    let protected = [
+        "bash",
+        "openssl",
+        "systemd-libs",
+        "glibc",
+        "pam",
+        "util-linux-libs",
+        "coreutils",
+        "filesystem",
+        "linux",
+        "shadow",
+        "rpk",
+        "tar",
+        "gzip",
+        "zstd",
+        "xz",
+        "grep",
+        "sed",
+        "awk",
+        "ncurses",
+    ];
+    if protected.contains(&pkg_name) {
         return Ok(());
     }
 
@@ -110,13 +134,13 @@ pub fn remove_package_recursive(
             if !is_installed(dep) {
                 continue;
             }
-            
+
             let used_by_other = reverse
                 .get(dep)
                 .map(|users| {
-                    users.iter().any(|pkg| {
-                        pkg != pkg_name && is_installed(pkg) && !removed.contains(pkg)
-                    })
+                    users
+                        .iter()
+                        .any(|pkg| pkg != pkg_name && is_installed(pkg) && !removed.contains(pkg))
                 })
                 .unwrap_or(false);
 
@@ -125,7 +149,7 @@ pub fn remove_package_recursive(
             }
         }
     }
-    
+
     remove_package_files(pkg_name)?;
     remove_package_from_db(pkg_name)?;
 
