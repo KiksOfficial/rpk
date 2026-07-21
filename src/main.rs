@@ -2,6 +2,7 @@ mod commands;
 mod filesystem;
 
 use commands::install::{build_repos_hashmap, install_pkg};
+use commands::list::list_installed;
 use commands::update_mirrors::update_mirrors;
 use commands::update_packages::{get_installed_packages, get_installed_version, update_pkg};
 use std::collections::HashSet;
@@ -28,10 +29,17 @@ pub fn run_install(args: Vec<String>) -> std::io::Result<()> {
     Ok(())
 }
 
+fn show_help() {
+    eprintln!("Command not found");
+    println!(
+        "-Sy                updates mirrors\n-S                 downloads packages\n-Syu               download latest mirrors and update all packages\n-R                 remove package ant its dependencies"
+    );
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let argumendid: Vec<String> = args().collect();
     if argumendid.len() < 2 {
-        println!("Incorrect format (use rpk [option] [package])");
+        show_help();
         return Ok(());
     }
     println!("{:?}", &argumendid);
@@ -113,8 +121,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         }
+
+        "-Q" => list_installed()?,
         _ => {
-            eprintln!("Command not found")
+            eprintln!("Command not found");
+            show_help();
         }
     }
 
