@@ -169,6 +169,7 @@ pub fn mark_installed(
 
     Ok(())
 }
+
 pub fn install_pkg(
     index: &HashMap<String, (String, String, String)>,
     package_name: &str,
@@ -176,7 +177,7 @@ pub fn install_pkg(
     force: bool,
 ) -> io::Result<()> {
     if is_installed(package_name) && !force {
-        println!("{} already installed", package_name);
+        println!("{package_name} already installed");
         return Ok(());
     }
 
@@ -184,44 +185,32 @@ pub fn install_pkg(
         return Ok(());
     }
 
-    match get_link(index, package_name) {
-        Some(pkg_link) => {
-            let file_name = format!("{}.tar.zst", package_name);
-            let output_path = Path::new("/tmp").join(&file_name);
+    let Some(pkg_link) = get_link(index, package_name) else {
+        println!("Pkg '{package_name}' not found in any repo.");
+        return Ok(());
+    };
 
-            println!("Downloading {}...", package_name);
+    let output_path = Path::new("/tmp").join(format!("{package_name}.tar.zst"));
 
-            download_file(&pkg_link, &output_path)?;
+    println!("Downloading {package_name}...");
+    download_file(&pkg_link, &output_path)?;
 
-            let pkg_meta_contents = read_pkg_info(&output_path).map_err(io::Error::other)?;
+    let package = parse_pkg_info(&read_pkg_info(&output_path).map_err(io::Error::other)?)?;
 
-            let package = parse_pkg_info(&pkg_meta_contents)?;
-            println!("{:?}", &package);
-
-            for dep in &package.dependencies {
-                let dep_name = dep.split(&['<', '>', '=', ' '][..]).next().unwrap();
-
-                install_pkg(index, dep_name, visited, force)?;
-            }
-
-            let fake_root = Path::new("/home/kiks/Proge/fake-root");
-
-            println!("Unpacking {}...", package_name);
-
-            let files = unpack_package(&output_path, fake_root).map_err(std::io::Error::other)?;
-
-            let depends = package.dependencies;
-
-            if !files.is_empty() {
-                mark_installed(package_name, &package.version, files, depends)?;
-            }
-            fs::remove_file(output_path)?;
-        }
-
-        None => {
-            println!("Pkg '{}' not found in any repo.", package_name);
-        }
+    for dep in &package.dependencies {
+        let dep_name = dep.split(&['<', '>', '=', ' '][..]).next().unwrap();
+        install_pkg(index, dep_name, visited, force)?;
     }
 
+    println!("Unpacking {package_name}...");
+
+    let files = unpack_package(&output_path, Path::new("/home/kiks/Proge/fake-root"))
+        .map_err(io::Error::other)?;
+
+    if !files.is_empty() {
+        mark_installed(package_name, &package.version, files, package.dependencies)?;
+    }
+
+    fs::remove_file(output_path)?;
     Ok(())
 }

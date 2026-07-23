@@ -1,9 +1,10 @@
-use crate::commands::install::{download_file, get_link, mark_installed, parse_pkg_info};
+use crate::commands::install::{Package, download_file, get_link, mark_installed, parse_pkg_info};
 use crate::filesystem::{read_pkg_info, unpack_package};
 use std::collections::HashMap;
 use std::fs::{self, read_dir};
 use std::io;
 use std::path::Path;
+use std::path::PathBuf;
 
 pub fn get_installed_version(pkg_name: &str) -> io::Result<String> {
     let pkg_path = Path::new("/home/kiks/Proge/fake-root/var/lib/rpk_files")
@@ -33,38 +34,37 @@ pub fn get_installed_packages() -> io::Result<Vec<String>> {
     Ok(packages)
 }
 
+fn fetch_package(
+    index: &HashMap<String, (String, String, String)>,
+    package_name: &str,
+) -> io::Result<(Package, PathBuf)> {
+    let pkg_link = get_link(index, package_name)
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "package not found"))?;
+
+    let output_path = Path::new("/tmp").join(format!("{package_name}.tar.zst"));
+
+    println!("Downloading {}...", package_name);
+    download_file(&pkg_link, &output_path)?;
+
+    let pkg_meta = read_pkg_info(&output_path).map_err(io::Error::other)?;
+    let package = parse_pkg_info(&pkg_meta)?;
+
+    Ok((package, output_path))
+}
+
 pub fn update_pkg(
     index: &HashMap<String, (String, String, String)>,
     package_name: &str,
 ) -> io::Result<()> {
-    match get_link(index, package_name) {
-        Some(pkg_link) => {
-            let file_name = format!("{}.tar.zst", package_name);
-            let output_path = Path::new("/tmp").join(&file_name);
+    let (package, archive) = fetch_package(index, package_name)?;
 
-            println!("Downloading {}...", package_name);
+    println!("Unpacking {}...", package_name);
 
-            download_file(&pkg_link, &output_path)?;
+    let files = unpack_package(&archive, Path::new("/home/kiks/Proge/fake-root"))
+        .map_err(io::Error::other)?;
 
-            let pkg_meta_contents = read_pkg_info(&output_path).map_err(io::Error::other)?;
-
-            let package = parse_pkg_info(&pkg_meta_contents)?;
-
-            let fake_root = Path::new("/home/kiks/Proge/fake-root");
-
-            println!("Unpacking {}...", package_name);
-
-            let files = unpack_package(&output_path, fake_root).map_err(io::Error::other)?;
-
-            mark_installed(package_name, &package.version, files, package.dependencies)?;
-
-            fs::remove_file(output_path)?;
-        }
-
-        None => {
-            println!("Pkg '{}' not found in any repo.", package_name);
-        }
-    }
+    mark_installed(package_name, &package.version, files, package.dependencies)?;
+    fs::remove_file(archive)?;
 
     Ok(())
 }

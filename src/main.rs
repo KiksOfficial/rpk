@@ -32,7 +32,7 @@ pub fn run_install(args: Vec<String>) -> std::io::Result<()> {
 fn show_help() {
     eprintln!("Command not found");
     println!(
-        "-Sy                updates mirrors\n-S                 downloads packages\n-Syu               download latest mirrors and update all packages\n-R                 remove package ant its dependencies"
+        "-Sy                updates mirrors\n-S                 downloads packages\n-Syu               download latest mirrors and update all packages\n-R                 remove package ant its dependencies\n-Q                 list packages"
     );
 }
 
