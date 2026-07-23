@@ -169,3 +169,47 @@ pub fn remove_package_from_db(pkg_name: &str) -> io::Result<()> {
 
     Ok(())
 }
+
+pub fn run_remove(argumendid: &[String]) -> std::io::Result<()> {
+    use std::collections::HashSet;
+    use std::path::Path;
+
+    let db = Path::new("/home/kiks/Proge/fake-root/var/lib/rpk_db.txt");
+
+    println!("Loading DB: {:?}", db);
+
+    let dependencies = match build_dependency_hashmap(db) {
+        Ok(x) => {
+            println!("Dependency DB loaded");
+            x
+        }
+        Err(e) => {
+            eprintln!("Dependency DB failed: {}", e);
+            return Ok(());
+        }
+    };
+
+    let reverse = match build_reverse_hashmap(db) {
+        Ok(x) => {
+            println!("Reverse DB loaded");
+            x
+        }
+        Err(e) => {
+            eprintln!("Reverse DB failed: {}", e);
+            return Ok(());
+        }
+    };
+
+    let mut removed = HashSet::new();
+
+    println!("ok");
+
+    for arg in argumendid.iter() {
+        println!("Removing {}", arg);
+
+        if let Err(e) = remove_package_recursive(arg, &dependencies, &reverse, &mut removed) {
+            eprintln!("Remove failed: {}", e);
+        }
+    }
+    Ok(())
+}

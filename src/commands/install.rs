@@ -214,3 +214,24 @@ pub fn install_pkg(
     fs::remove_file(output_path)?;
     Ok(())
 }
+
+pub fn run_install(args: Vec<String>) -> std::io::Result<()> {
+    let mut visited = HashSet::new();
+    let core = build_repos_hashmap("core")?;
+    let extra = build_repos_hashmap("extra")?;
+    let mut index = core;
+    index.extend(extra);
+    println!("Loaded {} packages", &index.len());
+    for package in args.iter().skip(2) {
+        println!("Trying to install: {}", package);
+        println!("{:?}", index.get("htop"));
+        match install_pkg(&index, package, &mut visited, false) {
+            Ok(()) => {}
+            Err(e) => {
+                eprintln!("{}", e)
+            }
+        }
+    }
+
+    Ok(())
+}

@@ -1,5 +1,9 @@
-use crate::commands::install::{Package, download_file, get_link, mark_installed, parse_pkg_info};
+use crate::commands::install::{
+    Package, build_repos_hashmap, download_file, get_link, mark_installed, parse_pkg_info,
+};
+use crate::commands::update_mirrors::update_mirrors;
 use crate::filesystem::{read_pkg_info, unpack_package};
+
 use std::collections::HashMap;
 use std::fs::{self, read_dir};
 use std::io;
@@ -66,5 +70,36 @@ pub fn update_pkg(
     mark_installed(package_name, &package.version, files, package.dependencies)?;
     fs::remove_file(archive)?;
 
+    Ok(())
+}
+
+pub fn run_sys_update() -> std::io::Result<()> {
+    update_mirrors()?;
+
+    let mut index = build_repos_hashmap("core")?;
+    let extra = build_repos_hashmap("extra")?;
+    index.extend(extra);
+
+    let installed = get_installed_packages()?;
+    println!("{:?}", &installed);
+
+    println!("Installed packages loaded: {}", &installed.len());
+
+    for pkg_name in installed {
+        if let Some((_repo, _filename, repo_version)) = index.get(&pkg_name) {
+            let local_version = get_installed_version(&pkg_name)?;
+
+            if local_version.trim() != repo_version.as_str() {
+                println!(
+                    "Upgrade available: {} {} -> {}",
+                    pkg_name,
+                    local_version.trim(),
+                    repo_version
+                );
+
+                update_pkg(&index, &pkg_name)?;
+            }
+        }
+    }
     Ok(())
 }
