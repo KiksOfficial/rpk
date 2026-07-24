@@ -1,6 +1,7 @@
 mod commands;
 mod filesystem;
 
+use commands::display_info::display_info;
 use commands::install::run_install;
 use commands::list::list_installed;
 use commands::remove::run_remove;
@@ -34,6 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         "-Q" => list_installed()?,
+        "-Ss" => display_info(&argumendid[2])?,
         _ => {
             eprintln!("Command not found");
             show_help();
