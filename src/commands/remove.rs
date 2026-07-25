@@ -172,7 +172,7 @@ pub fn remove_package_from_db(pkg_name: &str) -> io::Result<()> {
 }
 
 pub fn run_remove(argumendid: &[String]) -> std::io::Result<()> {
-    if let Err(e) = require_args(argumendid, 3, "Usage: rpk -S <package> [package...]") {
+    if let Err(e) = require_args(argumendid, 1, "Usage: rpk -S <package> [package...]") {
         eprintln!("{}", e);
         return Ok(());
     }

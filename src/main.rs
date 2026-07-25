@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match operation.as_str() {
         "-Sy" => update_mirrors()?,
-        "-S" => run_install(&argumendid)?,
+        "-S" => run_install(&argumendid[2..])?,
         "-Syu" => run_sys_update()?,
         "-R" => {
             run_remove(&argumendid[2..])?;

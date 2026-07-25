@@ -217,7 +217,7 @@ pub fn install_pkg(
 }
 
 pub fn run_install(args: &[String]) -> std::io::Result<()> {
-    if let Err(e) = require_args(args, 3, "Usage: rpk -S <package> [package...]") {
+    if let Err(e) = require_args(args, 1, "Usage: rpk -S <package> [package...]") {
         eprintln!("{}", e);
         return Ok(());
     }
@@ -227,9 +227,8 @@ pub fn run_install(args: &[String]) -> std::io::Result<()> {
     let mut index = core;
     index.extend(extra);
     println!("Loaded {} packages", &index.len());
-    for package in args.iter().skip(2) {
+    for package in args.iter() {
         println!("Trying to install: {}", package);
-        println!("{:?}", index.get("htop"));
         match install_pkg(&index, package, &mut visited, false) {
             Ok(()) => {}
             Err(e) => {
