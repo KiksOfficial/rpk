@@ -1,12 +1,13 @@
 mod commands;
 mod filesystem;
+mod handle_diff_errors;
 
 use commands::display_info::display_info;
 use commands::install::run_install;
 use commands::list::list_installed;
 use commands::remove::run_remove;
 use commands::update_mirrors::update_mirrors;
-use std::env::args;
+use std::env;
 
 use crate::commands::update_packages::run_sys_update;
 
@@ -18,7 +19,7 @@ fn show_help() {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let argumendid: Vec<String> = args().collect();
+    let argumendid: Vec<String> = env::args().collect();
     if argumendid.len() < 2 {
         show_help();
         return Ok(());
@@ -28,14 +29,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match operation.as_str() {
         "-Sy" => update_mirrors()?,
-        "-S" => run_install(argumendid)?,
+        "-S" => run_install(&argumendid)?,
         "-Syu" => run_sys_update()?,
         "-R" => {
-            run_remove(&argumendid[2..]);
+            run_remove(&argumendid[2..])?;
         }
 
         "-Q" => list_installed()?,
-        "-Ss" => display_info(&argumendid[2])?,
+        "-Ss" => display_info(&argumendid[2..])?,
         _ => {
             eprintln!("Command not found");
             show_help();

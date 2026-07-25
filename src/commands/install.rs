@@ -1,4 +1,5 @@
 use crate::filesystem::{read_pkg_info, unpack_package};
+use crate::handle_diff_errors::require_args;
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, create_dir_all, read_dir, read_to_string, write};
 use std::io::{self};
@@ -215,7 +216,11 @@ pub fn install_pkg(
     Ok(())
 }
 
-pub fn run_install(args: Vec<String>) -> std::io::Result<()> {
+pub fn run_install(args: &[String]) -> std::io::Result<()> {
+    if let Err(e) = require_args(args, 3, "Usage: rpk -S <package> [package...]") {
+        eprintln!("{}", e);
+        return Ok(());
+    }
     let mut visited = HashSet::new();
     let core = build_repos_hashmap("core")?;
     let extra = build_repos_hashmap("extra")?;

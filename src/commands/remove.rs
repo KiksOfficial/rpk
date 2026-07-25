@@ -1,8 +1,9 @@
 use crate::commands::install::is_installed;
+use crate::handle_diff_errors::require_args;
 use std::collections::{HashMap, HashSet};
-use std::fs::{remove_dir, remove_dir_all, remove_file};
+use std::fs::{self, remove_dir, remove_dir_all, remove_file};
 use std::io;
-use std::{fs, path::Path};
+use std::path::Path;
 
 pub fn build_dependency_hashmap(file: &Path) -> io::Result<HashMap<String, Vec<String>>> {
     let sisu = fs::read_to_string(file)?;
@@ -171,9 +172,10 @@ pub fn remove_package_from_db(pkg_name: &str) -> io::Result<()> {
 }
 
 pub fn run_remove(argumendid: &[String]) -> std::io::Result<()> {
-    use std::collections::HashSet;
-    use std::path::Path;
-
+    if let Err(e) = require_args(argumendid, 3, "Usage: rpk -S <package> [package...]") {
+        eprintln!("{}", e);
+        return Ok(());
+    }
     let db = Path::new("/home/kiks/Proge/fake-root/var/lib/rpk_db.txt");
 
     println!("Loading DB: {:?}", db);
