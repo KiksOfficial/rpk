@@ -1,3 +1,4 @@
+use crate::SomeRoot;
 use crate::commands::install::is_installed;
 use crate::handle_diff_errors::require_args;
 use std::collections::{HashMap, HashSet};
@@ -57,9 +58,8 @@ pub fn build_reverse_hashmap(file: &Path) -> io::Result<HashMap<String, Vec<Stri
     Ok(reverse)
 }
 
-pub fn remove_package_files(pkg_name: &str) -> io::Result<()> {
-    let root = Path::new("/home/kiks/Proge/fake-root/");
-
+pub fn remove_package_files(pkg_name: &str, root: &SomeRoot) -> io::Result<()> {
+    let root = &root.root_path;
     let files_txt = root
         .join("var/lib/rpk_files")
         .join(pkg_name)
@@ -96,6 +96,7 @@ pub fn remove_package_recursive(
     dependencies: &HashMap<String, Vec<String>>,
     reverse: &HashMap<String, Vec<String>>,
     removed: &mut HashSet<String>,
+    root: &SomeRoot,
 ) -> io::Result<()> {
     println!("Entering remove_package_recursive({})", pkg_name);
 
@@ -132,34 +133,34 @@ pub fn remove_package_recursive(
 
     if let Some(deps) = dependencies.get(pkg_name) {
         for dep in deps {
-            if !is_installed(dep) {
+            if !is_installed(dep, root) {
                 continue;
             }
 
             let used_by_other = reverse
                 .get(dep)
                 .map(|users| {
-                    users
-                        .iter()
-                        .any(|pkg| pkg != pkg_name && is_installed(pkg) && !removed.contains(pkg))
+                    users.iter().any(|pkg| {
+                        pkg != pkg_name && is_installed(pkg, root) && !removed.contains(pkg)
+                    })
                 })
                 .unwrap_or(false);
 
             if !used_by_other {
-                remove_package_recursive(dep, dependencies, reverse, removed)?;
+                remove_package_recursive(dep, dependencies, reverse, removed, root)?;
             }
         }
     }
 
-    remove_package_files(pkg_name)?;
-    remove_package_from_db(pkg_name)?;
+    remove_package_files(pkg_name, root)?;
+    remove_package_from_db(pkg_name, root)?;
 
     Ok(())
 }
-pub fn remove_package_from_db(pkg_name: &str) -> io::Result<()> {
-    let db_path = Path::new("/home/kiks/Proge/fake-root/var/lib/rpk_db.txt");
+pub fn remove_package_from_db(pkg_name: &str, root: &SomeRoot) -> io::Result<()> {
+    let db_path = root.root_path.join("var/lib/rpk_db.txt");
 
-    let content = fs::read_to_string(db_path)?;
+    let content = fs::read_to_string(&db_path)?;
 
     let filtered: Vec<&str> = content
         .lines()
@@ -171,16 +172,16 @@ pub fn remove_package_from_db(pkg_name: &str) -> io::Result<()> {
     Ok(())
 }
 
-pub fn run_remove(argumendid: &[String]) -> std::io::Result<()> {
+pub fn run_remove(argumendid: &[String], root: &SomeRoot) -> std::io::Result<()> {
     if let Err(e) = require_args(argumendid, 1, "Usage: rpk -S <package> [package...]") {
         eprintln!("{}", e);
         return Ok(());
     }
-    let db = Path::new("/home/kiks/Proge/fake-root/var/lib/rpk_db.txt");
+    let db = root.root_path.join("var/lib/rpk_db.txt");
 
     println!("Loading DB: {:?}", db);
 
-    let dependencies = match build_dependency_hashmap(db) {
+    let dependencies = match build_dependency_hashmap(&db) {
         Ok(x) => {
             println!("Dependency DB loaded");
             x
@@ -191,7 +192,7 @@ pub fn run_remove(argumendid: &[String]) -> std::io::Result<()> {
         }
     };
 
-    let reverse = match build_reverse_hashmap(db) {
+    let reverse = match build_reverse_hashmap(&db) {
         Ok(x) => {
             println!("Reverse DB loaded");
             x
@@ -209,7 +210,7 @@ pub fn run_remove(argumendid: &[String]) -> std::io::Result<()> {
     for arg in argumendid.iter() {
         println!("Removing {}", arg);
 
-        if let Err(e) = remove_package_recursive(arg, &dependencies, &reverse, &mut removed) {
+        if let Err(e) = remove_package_recursive(arg, &dependencies, &reverse, &mut removed, root) {
             eprintln!("Remove failed: {}", e);
         }
     }

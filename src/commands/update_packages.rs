@@ -1,3 +1,4 @@
+use crate::SomeRoot;
 use crate::commands::install::{
     Package, build_repos_hashmap, download_file, get_link, mark_installed, parse_pkg_info,
 };
@@ -10,15 +11,17 @@ use std::io;
 use std::path::Path;
 use std::path::PathBuf;
 
-pub fn get_installed_version(pkg_name: &str) -> io::Result<String> {
-    let pkg_path = Path::new("/home/kiks/Proge/fake-root/var/lib/rpk_files")
+pub fn get_installed_version(pkg_name: &str, root: &SomeRoot) -> io::Result<String> {
+    let pkg_path = root
+        .root_path
+        .join("var/lib/rpk_files")
         .join(pkg_name)
         .join("version.txt");
     fs::read_to_string(pkg_path)
 }
 
-pub fn get_installed_packages() -> io::Result<Vec<String>> {
-    let db = Path::new("/home/kiks/Proge/fake-root/var/lib/rpk_files");
+pub fn get_installed_packages(root: &SomeRoot) -> io::Result<Vec<String>> {
+    let db = root.root_path.join("var/lib/rpk_files");
 
     if !db.exists() {
         return Ok(Vec::new());
@@ -59,35 +62,41 @@ fn fetch_package(
 pub fn update_pkg(
     index: &HashMap<String, (String, String, String)>,
     package_name: &str,
+    root: &SomeRoot,
 ) -> io::Result<()> {
     let (package, archive) = fetch_package(index, package_name)?;
 
     println!("Unpacking {}...", package_name);
 
-    let files = unpack_package(&archive, Path::new("/home/kiks/Proge/fake-root"))
-        .map_err(io::Error::other)?;
+    let files = unpack_package(&archive, &root.root_path).map_err(io::Error::other)?;
 
-    mark_installed(package_name, &package.version, files, package.dependencies)?;
+    mark_installed(
+        package_name,
+        &package.version,
+        files,
+        package.dependencies,
+        root,
+    )?;
     fs::remove_file(archive)?;
 
     Ok(())
 }
 
-pub fn run_sys_update() -> std::io::Result<()> {
+pub fn run_sys_update(root: &SomeRoot) -> std::io::Result<()> {
     update_mirrors()?;
 
     let mut index = build_repos_hashmap("core")?;
     let extra = build_repos_hashmap("extra")?;
     index.extend(extra);
 
-    let installed = get_installed_packages()?;
+    let installed = get_installed_packages(root)?;
     println!("{:?}", &installed);
 
     println!("Installed packages loaded: {}", &installed.len());
 
     for pkg_name in installed {
         if let Some((_repo, _filename, repo_version)) = index.get(&pkg_name) {
-            let local_version = get_installed_version(&pkg_name)?;
+            let local_version = get_installed_version(&pkg_name, root)?;
 
             if local_version.trim() != repo_version.as_str() {
                 println!(
@@ -97,7 +106,7 @@ pub fn run_sys_update() -> std::io::Result<()> {
                     repo_version
                 );
 
-                update_pkg(&index, &pkg_name)?;
+                update_pkg(&index, &pkg_name, root)?;
             }
         }
     }

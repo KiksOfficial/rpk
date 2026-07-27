@@ -1,5 +1,8 @@
+use crate::commands::verify_sig::{download_sig, verify_sig};
 use crate::filesystem::{read_pkg_info, unpack_package};
 use crate::handle_diff_errors::require_args;
+use crate::{RootKind, SomeRoot};
+
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, create_dir_all, read_dir, read_to_string, write};
 use std::io::{self};
@@ -125,8 +128,8 @@ pub fn get_link(
     })
 }
 
-pub fn is_installed(pkg: &str) -> bool {
-    match read_to_string("/home/kiks/Proge/fake-root/var/lib/rpk_db.txt") {
+pub fn is_installed(pkg: &str, root: &SomeRoot) -> bool {
+    match read_to_string(root.root_path.join(Path::new("var/lib/rpk_db.txt"))) {
         Ok(db) => db.lines().any(|line| {
             line.split_once(':')
                 .map(|(name, _)| name == pkg)
@@ -141,8 +144,9 @@ pub fn mark_installed(
     version: &str,
     files: Vec<String>,
     depends: Vec<String>,
+    root: &SomeRoot,
 ) -> io::Result<()> {
-    let lib_dir = Path::new("/home/kiks/Proge/fake-root/var/lib");
+    let lib_dir = root.root_path.join("var/lib");
     let files_dir = lib_dir.join("rpk_files").join(pkg);
     let db_path = lib_dir.join("rpk_db.txt");
 
@@ -175,9 +179,10 @@ pub fn install_pkg(
     index: &HashMap<String, (String, String, String)>,
     package_name: &str,
     visited: &mut HashSet<String>,
+    root: &SomeRoot,
     force: bool,
 ) -> io::Result<()> {
-    if is_installed(package_name) && !force {
+    if is_installed(package_name, root) && !force {
         println!("{package_name} already installed");
         return Ok(());
     }
@@ -194,29 +199,39 @@ pub fn install_pkg(
     let output_path = Path::new("/tmp").join(format!("{package_name}.tar.zst"));
 
     println!("Downloading {package_name}...");
+    download_sig(&pkg_link, &output_path)?;
     download_file(&pkg_link, &output_path)?;
+
+    let sig_path = std::path::PathBuf::from(format!("{}.sig", output_path.display()));
+
+    verify_sig(&sig_path, &output_path)?;
 
     let package = parse_pkg_info(&read_pkg_info(&output_path).map_err(io::Error::other)?)?;
 
     for dep in &package.dependencies {
         let dep_name = dep.split(&['<', '>', '=', ' '][..]).next().unwrap();
-        install_pkg(index, dep_name, visited, force)?;
+        install_pkg(index, dep_name, visited, root, force)?;
     }
 
     println!("Unpacking {package_name}...");
 
-    let files = unpack_package(&output_path, Path::new("/home/kiks/Proge/fake-root"))
-        .map_err(io::Error::other)?;
+    let files = unpack_package(&output_path, &root.root_path).map_err(io::Error::other)?;
 
     if !files.is_empty() {
-        mark_installed(package_name, &package.version, files, package.dependencies)?;
+        mark_installed(
+            package_name,
+            &package.version,
+            files,
+            package.dependencies,
+            &root,
+        )?;
     }
 
     fs::remove_file(output_path)?;
     Ok(())
 }
 
-pub fn run_install(args: &[String]) -> std::io::Result<()> {
+pub fn run_install(args: &[String], root: &SomeRoot) -> std::io::Result<()> {
     if let Err(e) = require_args(args, 1, "Usage: rpk -S <package> [package...]") {
         eprintln!("{}", e);
         return Ok(());
@@ -229,7 +244,7 @@ pub fn run_install(args: &[String]) -> std::io::Result<()> {
     println!("Loaded {} packages", &index.len());
     for package in args.iter() {
         println!("Trying to install: {}", package);
-        match install_pkg(&index, package, &mut visited, false) {
+        match install_pkg(&index, package, &mut visited, root, false) {
             Ok(()) => {}
             Err(e) => {
                 eprintln!("{}", e)

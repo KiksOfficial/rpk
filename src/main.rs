@@ -8,8 +8,33 @@ use commands::list::list_installed;
 use commands::remove::run_remove;
 use commands::update_mirrors::update_mirrors;
 use std::env;
+use std::path::{Path, PathBuf};
 
+use crate::RootKind::{FakeRoot, RealRoot};
 use crate::commands::update_packages::run_sys_update;
+
+enum RootKind {
+    FakeRoot,
+    RealRoot,
+}
+
+struct SomeRoot {
+    pub kind: RootKind,
+    pub root_path: PathBuf,
+}
+
+impl SomeRoot {
+    pub fn path(&self) -> &PathBuf {
+        &self.root_path
+    }
+
+    pub fn is_fake(&self) -> bool {
+        match self.kind {
+            RootKind::FakeRoot => true,
+            RootKind::RealRoot => false,
+        }
+    }
+}
 
 fn show_help() {
     eprintln!("Command not found");
@@ -19,6 +44,20 @@ fn show_help() {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let testing = true;
+
+    let ROOT = if testing {
+        SomeRoot {
+            kind: RootKind::FakeRoot,
+            root_path: PathBuf::from("/home/kiks/Proge/fake-root/"),
+        }
+    } else {
+        SomeRoot {
+            kind: RootKind::RealRoot,
+            root_path: PathBuf::from("/"),
+        }
+    };
+
     let argumendid: Vec<String> = env::args().collect();
     if argumendid.len() < 2 {
         show_help();
@@ -29,14 +68,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match operation.as_str() {
         "-Sy" => update_mirrors()?,
-        "-S" => run_install(&argumendid[2..])?,
-        "-Syu" => run_sys_update()?,
+        "-S" => run_install(&argumendid[2..], &ROOT)?,
+        "-Syu" => run_sys_update(&ROOT)?,
         "-R" => {
-            run_remove(&argumendid[2..])?;
+            run_remove(&argumendid[2..], &ROOT)?;
         }
 
-        "-Q" => list_installed()?,
-        "-Ss" => display_info(&argumendid[2..])?,
+        "-Q" => list_installed(&ROOT)?,
+        "-Ss" => display_info(&argumendid[2..], &ROOT)?,
         _ => {
             eprintln!("Command not found");
             show_help();
