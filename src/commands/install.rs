@@ -223,7 +223,7 @@ pub fn install_pkg(
             &package.version,
             files,
             package.dependencies,
-            &root,
+            root,
         )?;
     }
 
@@ -241,6 +241,7 @@ pub fn run_install(args: &[String], root: &SomeRoot) -> std::io::Result<()> {
     let extra = build_repos_hashmap("extra")?;
     let mut index = core;
     index.extend(extra);
+    println!("{:?}", &index);
     println!("Loaded {} packages", &index.len());
     for package in args.iter() {
         println!("Trying to install: {}", package);

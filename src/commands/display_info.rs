@@ -1,7 +1,5 @@
-use std::fs;
-use std::path::Path;
-
 use crate::SomeRoot;
+use std::fs;
 
 pub fn display_info(pkg_names: &[String], root: &SomeRoot) -> std::io::Result<()> {
     for pkg_name in pkg_names.iter() {

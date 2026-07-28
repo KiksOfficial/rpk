@@ -2,16 +2,20 @@ mod commands;
 mod filesystem;
 mod handle_diff_errors;
 
+mod unstable;
+
 use commands::display_info::display_info;
 use commands::install::run_install;
 use commands::list::list_installed;
 use commands::remove::run_remove;
 use commands::update_mirrors::update_mirrors;
+use std::collections::HashSet;
 use std::env;
 use std::path::{Path, PathBuf};
 
 use crate::RootKind::{FakeRoot, RealRoot};
 use crate::commands::update_packages::run_sys_update;
+use unstable::resolve;
 
 enum RootKind {
     FakeRoot,
@@ -21,19 +25,6 @@ enum RootKind {
 struct SomeRoot {
     pub kind: RootKind,
     pub root_path: PathBuf,
-}
-
-impl SomeRoot {
-    pub fn path(&self) -> &PathBuf {
-        &self.root_path
-    }
-
-    pub fn is_fake(&self) -> bool {
-        match self.kind {
-            RootKind::FakeRoot => true,
-            RootKind::RealRoot => false,
-        }
-    }
 }
 
 fn show_help() {
@@ -46,7 +37,7 @@ fn show_help() {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let testing = true;
 
-    let ROOT = if testing {
+    let root = if testing {
         SomeRoot {
             kind: RootKind::FakeRoot,
             root_path: PathBuf::from("/home/kiks/Proge/fake-root/"),
@@ -68,14 +59,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match operation.as_str() {
         "-Sy" => update_mirrors()?,
-        "-S" => run_install(&argumendid[2..], &ROOT)?,
-        "-Syu" => run_sys_update(&ROOT)?,
+        "-S" => run_install(&argumendid[2..], &root)?,
+        "-Syu" => run_sys_update(&root)?,
         "-R" => {
-            run_remove(&argumendid[2..], &ROOT)?;
+            run_remove(&argumendid[2..], &root)?;
         }
 
-        "-Q" => list_installed(&ROOT)?,
-        "-Ss" => display_info(&argumendid[2..], &ROOT)?,
+        "-Q" => list_installed(&root)?,
+        "-Ss" => display_info(&argumendid[2..], &root)?,
+        "test" => {
+            let mut visited = HashSet::new();
+            resolve("fzf", &mut visited)?;
+
+            println!("{visited:#?}");
+        }
         _ => {
             eprintln!("Command not found");
             show_help();
