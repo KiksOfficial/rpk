@@ -4,18 +4,20 @@ mod handle_diff_errors;
 
 mod unstable;
 
+use crate::commands::install::build_repos_hashmap;
 use commands::display_info::display_info;
 use commands::install::run_install;
 use commands::list::list_installed;
 use commands::remove::run_remove;
 use commands::update_mirrors::update_mirrors;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use crate::RootKind::{FakeRoot, RealRoot};
 use crate::commands::update_packages::run_sys_update;
-use unstable::resolve;
+use unstable::{install_transaction, resolve, run_new_install};
 
 enum RootKind {
     FakeRoot,
@@ -68,10 +70,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "-Q" => list_installed(&root)?,
         "-Ss" => display_info(&argumendid[2..], &root)?,
         "test" => {
-            let mut visited = HashSet::new();
-            resolve("fzf", &mut visited)?;
+            let mut index = build_repos_hashmap("core")?;
+            index.extend(build_repos_hashmap("extra")?);
 
-            println!("{visited:#?}");
+            let mut visited = HashSet::new();
+            let mut graph = HashMap::new();
+
+            resolve(&index, &argumendid[2], &mut visited, &mut graph, &root)?;
+
+            let archives = run_new_install(Arc::new(index), visited)?;
+
+            println!("{:#?}", &graph);
+            println!("{:#?}", &archives);
+
+            install_transaction(archives, graph, &root)?;
         }
         _ => {
             eprintln!("Command not found");
