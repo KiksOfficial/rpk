@@ -1,13 +1,15 @@
+use crate::SomeRoot;
 use crate::commands::verify_sig::{download_sig, verify_sig};
 use crate::filesystem::{read_pkg_info, unpack_package};
 use crate::handle_diff_errors::require_args;
-use crate::{RootKind, SomeRoot};
 
 use std::collections::{HashMap, HashSet};
-use std::fs::{self, create_dir_all, read_dir, read_to_string, write};
+use std::fs::{create_dir_all, read_dir, read_to_string, write};
 use std::io::{self};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Arc;
+use std::thread;
 
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -175,59 +177,171 @@ pub fn mark_installed(
     Ok(())
 }
 
-pub fn install_pkg(
+pub fn get_data_file(
     index: &HashMap<String, (String, String, String)>,
-    package_name: &str,
+    pkg_name: &str,
+) -> io::Result<PathBuf> {
+    if let Some((repo, _filename, version)) = index.get(pkg_name) {
+        return Ok(PathBuf::from(format!(
+            "/tmp/mirror_list/{}_db/{}-{}/desc",
+            repo, pkg_name, version
+        )));
+    }
+
+    Err(io::Error::new(
+        io::ErrorKind::NotFound,
+        format!("package {pkg_name} not found"),
+    ))
+}
+
+pub fn read_data_into_hashset(data_file: &Path) -> io::Result<HashSet<String>> {
+    let content = read_to_string(data_file)?;
+    let mut deps = HashSet::new();
+
+    let mut in_depends = false;
+
+    for line in content.lines() {
+        match line {
+            "%DEPENDS%" => {
+                in_depends = true;
+                continue;
+            }
+            l if l.starts_with('%') => {
+                in_depends = false;
+                continue;
+            }
+            _ => {}
+        }
+
+        if in_depends && !line.is_empty() {
+            let dep = line.split(['<', '>', '=']).next().unwrap().trim();
+
+            deps.insert(dep.to_string());
+        }
+    }
+
+    Ok(deps)
+}
+
+pub fn resolve(
+    index: &HashMap<String, (String, String, String)>,
+    pkg: &str,
     visited: &mut HashSet<String>,
+    graph: &mut HashMap<String, HashSet<String>>,
     root: &SomeRoot,
-    force: bool,
 ) -> io::Result<()> {
-    if is_installed(package_name, root) && !force {
-        println!("{package_name} already installed");
+    if is_installed(pkg, root) {
+        println!("{pkg} already installed");
         return Ok(());
     }
 
-    if !visited.insert(package_name.to_string()) {
+    if !visited.insert(pkg.to_owned()) {
         return Ok(());
     }
 
-    let Some(pkg_link) = get_link(index, package_name) else {
-        println!("Pkg '{package_name}' not found in any repo.");
-        return Ok(());
-    };
+    let deps = read_data_into_hashset(&get_data_file(index, pkg)?)?;
 
-    let output_path = Path::new("/tmp").join(format!("{package_name}.tar.zst"));
+    let deps = deps
+        .into_iter()
+        .filter(|dep| !dep.ends_with(".so") && dep != "sh")
+        .collect::<HashSet<_>>();
 
-    println!("Downloading {package_name}...");
-    download_sig(&pkg_link, &output_path)?;
-    download_file(&pkg_link, &output_path)?;
+    graph.insert(pkg.to_owned(), deps.clone());
 
-    let sig_path = std::path::PathBuf::from(format!("{}.sig", output_path.display()));
-
-    verify_sig(&sig_path, &output_path)?;
-
-    let package = parse_pkg_info(&read_pkg_info(&output_path).map_err(io::Error::other)?)?;
-
-    for dep in &package.dependencies {
-        let dep_name = dep.split(&['<', '>', '=', ' '][..]).next().unwrap();
-        install_pkg(index, dep_name, visited, root, force)?;
+    for dep in deps {
+        resolve(index, &dep, visited, graph, root)?;
     }
 
-    println!("Unpacking {package_name}...");
+    Ok(())
+}
 
-    let files = unpack_package(&output_path, &root.root_path).map_err(io::Error::other)?;
+pub fn run_new_install(
+    index: Arc<HashMap<String, (String, String, String)>>,
+    packages: HashSet<String>,
+) -> io::Result<HashMap<String, PathBuf>> {
+    let handles: Vec<_> = packages
+        .into_iter()
+        .map(|pkg| {
+            let index = Arc::clone(&index);
 
-    if !files.is_empty() {
-        mark_installed(
-            package_name,
-            &package.version,
-            files,
-            package.dependencies,
-            root,
-        )?;
+            thread::spawn(move || -> io::Result<(String, PathBuf)> {
+                let link = get_link(&index, &pkg)
+                    .ok_or_else(|| io::Error::other(format!("package {pkg} not found")))?;
+
+                let path = PathBuf::from(format!("/tmp/{pkg}.pkg.tar.zst"));
+
+                println!("Downloading {pkg}");
+
+                download_sig(&link, &path)?;
+                download_file(&link, &path)?;
+
+                let sig = PathBuf::from(format!("{}.sig", path.display()));
+
+                verify_sig(&sig, &path)?;
+
+                Ok((pkg, path))
+            })
+        })
+        .collect();
+
+    let mut result = HashMap::new();
+
+    for handle in handles {
+        let (pkg, path) = handle
+            .join()
+            .map_err(|_| io::Error::other("download thread panicked"))??;
+
+        result.insert(pkg, path);
     }
 
-    fs::remove_file(output_path)?;
+    Ok(result)
+}
+
+pub fn clean_graph(graph: &mut HashMap<String, HashSet<String>>) {
+    let packages: HashSet<String> = graph.keys().cloned().collect();
+
+    for deps in graph.values_mut() {
+        deps.retain(|dep| packages.contains(dep));
+    }
+}
+
+pub fn install_transaction(
+    archives: HashMap<String, PathBuf>,
+    mut graph: HashMap<String, HashSet<String>>,
+    root: &SomeRoot,
+) -> io::Result<()> {
+    clean_graph(&mut graph);
+
+    let mut remaining = graph;
+
+    while !remaining.is_empty() {
+        let ready: Vec<String> = remaining
+            .iter()
+            .filter(|(_, deps)| deps.iter().all(|dep| !remaining.contains_key(dep)))
+            .map(|(pkg, _)| pkg.clone())
+            .collect();
+
+        if ready.is_empty() {
+            return Err(io::Error::other("dependency cycle detected"));
+        }
+
+        for pkg in ready {
+            let archive = archives
+                .get(&pkg)
+                .ok_or_else(|| io::Error::other(format!("missing archive for {pkg}")))?;
+
+            println!("Installing {pkg}");
+
+            let files = unpack_package(archive, &root.root_path).map_err(io::Error::other)?;
+
+            let package = parse_pkg_info(&read_pkg_info(archive).map_err(io::Error::other)?)?;
+
+            mark_installed(&pkg, &package.version, files, package.dependencies, root)?;
+
+            remaining.remove(&pkg);
+        }
+    }
+
     Ok(())
 }
 
@@ -236,22 +350,20 @@ pub fn run_install(args: &[String], root: &SomeRoot) -> std::io::Result<()> {
         eprintln!("{}", e);
         return Ok(());
     }
+    let mut index = build_repos_hashmap("core")?;
+    index.extend(build_repos_hashmap("extra")?);
+
     let mut visited = HashSet::new();
-    let core = build_repos_hashmap("core")?;
-    let extra = build_repos_hashmap("extra")?;
-    let mut index = core;
-    index.extend(extra);
-    println!("{:?}", &index);
-    println!("Loaded {} packages", &index.len());
-    for package in args.iter() {
-        println!("Trying to install: {}", package);
-        match install_pkg(&index, package, &mut visited, root, false) {
-            Ok(()) => {}
-            Err(e) => {
-                eprintln!("{}", e)
-            }
-        }
-    }
+    let mut graph = HashMap::new();
+
+    resolve(&index, &args[0], &mut visited, &mut graph, root)?;
+
+    let archives = run_new_install(Arc::new(index), visited)?;
+
+    println!("{:#?}", &graph);
+    println!("{:#?}", &archives);
+
+    install_transaction(archives, graph, root)?;
 
     Ok(())
 }
