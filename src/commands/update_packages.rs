@@ -3,6 +3,7 @@ use crate::commands::install::{
     Package, build_repos_hashmap, download_file, get_link, mark_installed, parse_pkg_info,
 };
 use crate::commands::update_mirrors::update_mirrors;
+use crate::commands::verify_sig::{download_sig, verify_sig};
 use crate::filesystem::{read_pkg_info, unpack_package};
 
 use std::collections::HashMap;
@@ -10,6 +11,8 @@ use std::fs::{self, read_dir};
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::Mutex;
+use std::thread;
 
 pub fn get_installed_version(pkg_name: &str, root: &SomeRoot) -> io::Result<String> {
     let pkg_path = root
@@ -42,7 +45,7 @@ pub fn get_installed_packages(root: &SomeRoot) -> io::Result<Vec<String>> {
 }
 
 fn fetch_package(
-    index: &HashMap<String, (String, String, String)>,
+    index: &HashMap<String, (String, String, String, PathBuf)>,
     package_name: &str,
 ) -> io::Result<(Package, PathBuf)> {
     let pkg_link = get_link(index, package_name)
@@ -52,6 +55,10 @@ fn fetch_package(
 
     println!("Downloading {}...", package_name);
     download_file(&pkg_link, &output_path)?;
+    download_sig(&pkg_link, &output_path)?;
+    let sig = PathBuf::from(format!("{}.sig", output_path.display()));
+
+    verify_sig(&sig, &output_path)?;
 
     let pkg_meta = read_pkg_info(&output_path).map_err(io::Error::other)?;
     let package = parse_pkg_info(&pkg_meta)?;
@@ -60,7 +67,7 @@ fn fetch_package(
 }
 
 pub fn update_pkg(
-    index: &HashMap<String, (String, String, String)>,
+    index: &HashMap<String, (String, String, String, PathBuf)>,
     package_name: &str,
     root: &SomeRoot,
 ) -> io::Result<()> {
@@ -82,7 +89,7 @@ pub fn update_pkg(
     Ok(())
 }
 
-pub fn run_sys_update(root: &SomeRoot) -> std::io::Result<()> {
+pub fn run_sys_update(root: &SomeRoot) -> io::Result<()> {
     update_mirrors()?;
 
     let mut index = build_repos_hashmap("core")?;
@@ -90,25 +97,29 @@ pub fn run_sys_update(root: &SomeRoot) -> std::io::Result<()> {
     index.extend(extra);
 
     let installed = get_installed_packages(root)?;
-    println!("{:?}", &installed);
+    println!("Installed packages loaded: {}", installed.len());
 
-    println!("Installed packages loaded: {}", &installed.len());
+    let outdated = Mutex::new(Vec::new());
 
-    for pkg_name in installed {
-        if let Some((_repo, _filename, repo_version)) = index.get(&pkg_name) {
-            let local_version = get_installed_version(&pkg_name, root)?;
+    thread::scope(|s| {
+        for pkg_name in installed {
+            let index = &index;
+            let outdated = &outdated;
 
-            if local_version.trim() != repo_version.as_str() {
-                println!(
-                    "Upgrade available: {} {} -> {}",
-                    pkg_name,
-                    local_version.trim(),
-                    repo_version
-                );
+            s.spawn(move || {
+                if let Some((_, _, repo_version, _)) = index.get(&pkg_name) {
+                    let local_version = get_installed_version(&pkg_name, root).unwrap();
 
-                update_pkg(&index, &pkg_name, root)?;
-            }
+                    if local_version.trim() != repo_version {
+                        outdated.lock().unwrap().push(pkg_name);
+                    }
+                }
+            });
         }
+    });
+
+    for pkg in outdated.into_inner().unwrap() {
+        update_pkg(&index, &pkg, root)?;
     }
     Ok(())
 }

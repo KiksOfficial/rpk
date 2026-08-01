@@ -77,7 +77,9 @@ pub fn download_file(url: &str, output_path: &Path) -> io::Result<()> {
         )))
     }
 }
-pub fn build_repos_hashmap(repo: &str) -> io::Result<HashMap<String, (String, String, String)>> {
+pub fn build_repos_hashmap(
+    repo: &str,
+) -> io::Result<HashMap<String, (String, String, String, PathBuf)>> {
     let mut index = HashMap::new();
     let db_dir = Path::new("/tmp/mirror_list").join(format!("{}_db", repo));
 
@@ -94,35 +96,51 @@ pub fn build_repos_hashmap(repo: &str) -> io::Result<HashMap<String, (String, St
         let mut section = "";
         let mut version = None;
 
+        let mut provides = Vec::new();
+        let mut in_provides = false;
+
         for line in read_to_string(&desc)?.lines() {
             match line {
+                "" => section = "",
                 "%NAME%" => section = "%NAME%",
                 "%FILENAME%" => section = "%FILENAME%",
                 "%VERSION%" => section = "%VERSION%",
+
+                "%PROVIDES%" => {
+                    section = "%PROVIDES%";
+                }
                 _ => match section {
                     "%NAME%" if name.is_none() => name = Some(line.to_owned()),
 
                     "%FILENAME%" if filename.is_none() => filename = Some(line.to_owned()),
 
                     "%VERSION%" if version.is_none() => version = Some(line.to_owned()),
+                    "%PROVIDES%" => provides.push(line.to_owned()),
                     _ => {}
                 },
             }
-            if name.is_some() && filename.is_some() && version.is_some() {
-                break;
-            }
         }
         if let (Some(name), Some(filename), Some(version)) = (name, filename, version) {
-            index.insert(name, (repo.to_string(), filename, version));
+            let package = (repo.to_string(), filename, version, entry.clone());
+
+            index.insert(name.clone(), package.clone());
+
+            for provide in provides {
+                let provide_name = provide.split(['=', '<', '>']).next().unwrap().to_string();
+
+                if !index.contains_key(&provide_name) {
+                    index.insert(provide_name, package.clone());
+                }
+            }
         }
     }
     Ok(index)
 }
 pub fn get_link(
-    index: &HashMap<String, (String, String, String)>,
+    index: &HashMap<String, (String, String, String, PathBuf)>,
     pkg_name: &str,
 ) -> Option<String> {
-    index.get(pkg_name).map(|(repo, filename, _version)| {
+    index.get(pkg_name).map(|(repo, filename, _, _)| {
         format!(
             "https://mirrors.kernel.org/archlinux/{}/os/x86_64/{}",
             repo, filename
@@ -178,14 +196,11 @@ pub fn mark_installed(
 }
 
 pub fn get_data_file(
-    index: &HashMap<String, (String, String, String)>,
+    index: &HashMap<String, (String, String, String, PathBuf)>,
     pkg_name: &str,
 ) -> io::Result<PathBuf> {
-    if let Some((repo, _filename, version)) = index.get(pkg_name) {
-        return Ok(PathBuf::from(format!(
-            "/tmp/mirror_list/{}_db/{}-{}/desc",
-            repo, pkg_name, version
-        )));
+    if let Some((_, _, _, path)) = index.get(pkg_name) {
+        return Ok(path.join("desc"));
     }
 
     Err(io::Error::new(
@@ -224,39 +239,44 @@ pub fn read_data_into_hashset(data_file: &Path) -> io::Result<HashSet<String>> {
 }
 
 pub fn resolve(
-    index: &HashMap<String, (String, String, String)>,
+    index: &HashMap<String, (String, String, String, PathBuf)>,
     pkg: &str,
     visited: &mut HashSet<String>,
     graph: &mut HashMap<String, HashSet<String>>,
     root: &SomeRoot,
 ) -> io::Result<()> {
-    if is_installed(pkg, root) {
-        println!("{pkg} already installed");
+    let real_pkg = get_real_package_name(index, pkg).unwrap_or_else(|| pkg.to_string());
+
+    if is_installed(&real_pkg, root) {
         return Ok(());
     }
 
-    if !visited.insert(pkg.to_owned()) {
+    if !visited.insert(real_pkg.clone()) {
         return Ok(());
     }
 
-    let deps = read_data_into_hashset(&get_data_file(index, pkg)?)?;
+    let data_file = get_data_file(index, pkg)?;
+    let deps = read_data_into_hashset(&data_file)?;
 
     let deps = deps
         .into_iter()
-        .filter(|dep| !dep.ends_with(".so") && dep != "sh")
+        .filter(|dep| !dep.contains(".so=") && dep != "sh")
+        .map(|dep| get_real_package_name(index, &dep).unwrap_or(dep))
         .collect::<HashSet<_>>();
 
-    graph.insert(pkg.to_owned(), deps.clone());
+    graph.insert(real_pkg.clone(), deps.clone());
 
     for dep in deps {
-        resolve(index, &dep, visited, graph, root)?;
+        let real_dep = get_real_package_name(index, &dep).unwrap_or(dep);
+
+        resolve(index, &real_dep, visited, graph, root)?;
     }
 
     Ok(())
 }
 
 pub fn run_new_install(
-    index: Arc<HashMap<String, (String, String, String)>>,
+    index: Arc<HashMap<String, (String, String, String, PathBuf)>>,
     packages: HashSet<String>,
 ) -> io::Result<HashMap<String, PathBuf>> {
     let handles: Vec<_> = packages
@@ -272,10 +292,11 @@ pub fn run_new_install(
 
                 println!("Downloading {pkg}");
 
-                download_sig(&link, &path)?;
-                download_file(&link, &path)?;
-
+                let sig_url = format!("{}.sig", link);
                 let sig = PathBuf::from(format!("{}.sig", path.display()));
+
+                download_file(&sig_url, &sig)?;
+                download_file(&link, &path)?;
 
                 verify_sig(&sig, &path)?;
 
@@ -304,6 +325,32 @@ pub fn clean_graph(graph: &mut HashMap<String, HashSet<String>>) {
         deps.retain(|dep| packages.contains(dep));
     }
 }
+fn get_real_package_name(
+    index: &HashMap<String, (String, String, String, PathBuf)>,
+    name: &str,
+) -> Option<String> {
+    let (_, filename, _, _) = index.get(name)?;
+
+    let filename = filename.strip_suffix(".pkg.tar.zst")?;
+
+    let mut parts = filename.rsplitn(4, '-');
+
+    let _arch = parts.next()?;
+    let _pkgrel = parts.next()?;
+    let _pkgver = parts.next()?;
+    let pkgname = parts.next()?;
+
+    Some(pkgname.to_string())
+}
+
+fn resolve_dependency_names(
+    index: &HashMap<String, (String, String, String, PathBuf)>,
+    deps: Vec<String>,
+) -> Vec<String> {
+    deps.into_iter()
+        .filter_map(|dep| get_real_package_name(index, &dep).or_else(|| Some(dep)))
+        .collect()
+}
 
 pub fn install_transaction(
     archives: HashMap<String, PathBuf>,
@@ -322,7 +369,31 @@ pub fn install_transaction(
             .collect();
 
         if ready.is_empty() {
-            return Err(io::Error::other("dependency cycle detected"));
+            println!("Dependency cycle detected, installing remaining packages together:");
+
+            for pkg in remaining.keys() {
+                println!("  {pkg}");
+            }
+
+            let ready: Vec<String> = remaining.keys().cloned().collect();
+
+            for pkg in ready {
+                let archive = archives
+                    .get(&pkg)
+                    .ok_or_else(|| io::Error::other(format!("missing archive for {pkg}")))?;
+
+                println!("Installing {pkg}");
+
+                let files = unpack_package(archive, &root.root_path).map_err(io::Error::other)?;
+
+                let package = parse_pkg_info(&read_pkg_info(archive).map_err(io::Error::other)?)?;
+
+                mark_installed(&pkg, &package.version, files, package.dependencies, root)?;
+
+                remaining.remove(&pkg);
+            }
+
+            break;
         }
 
         for pkg in ready {
@@ -355,6 +426,11 @@ pub fn run_install(args: &[String], root: &SomeRoot) -> std::io::Result<()> {
 
     let mut visited = HashSet::new();
     let mut graph = HashMap::new();
+
+    println!("gdk-pixbuf2 = {:?}", index.get("gdk-pixbuf2"));
+    println!("glycin = {:?}", index.get("glycin"));
+    println!("libglvnd = {:?}", index.get("libglvnd"));
+    println!("nvidia-utils = {:?}", index.get("nvidia-utils"));
 
     resolve(&index, &args[0], &mut visited, &mut graph, root)?;
 
