@@ -1,5 +1,5 @@
 use crate::SomeRoot;
-use crate::commands::verify_sig::{download_sig, verify_sig};
+use crate::commands::verify_sig::verify_sig;
 use crate::filesystem::{read_pkg_info, unpack_package};
 use crate::handle_diff_errors::require_args;
 
@@ -97,7 +97,6 @@ pub fn build_repos_hashmap(
         let mut version = None;
 
         let mut provides = Vec::new();
-        let mut in_provides = false;
 
         for line in read_to_string(&desc)?.lines() {
             match line {
@@ -128,9 +127,7 @@ pub fn build_repos_hashmap(
             for provide in provides {
                 let provide_name = provide.split(['=', '<', '>']).next().unwrap().to_string();
 
-                if !index.contains_key(&provide_name) {
-                    index.insert(provide_name, package.clone());
-                }
+                index.entry(provide_name).or_insert_with(|| package.clone());
             }
         }
     }
@@ -343,15 +340,6 @@ fn get_real_package_name(
     Some(pkgname.to_string())
 }
 
-fn resolve_dependency_names(
-    index: &HashMap<String, (String, String, String, PathBuf)>,
-    deps: Vec<String>,
-) -> Vec<String> {
-    deps.into_iter()
-        .filter_map(|dep| get_real_package_name(index, &dep).or_else(|| Some(dep)))
-        .collect()
-}
-
 pub fn install_transaction(
     archives: HashMap<String, PathBuf>,
     mut graph: HashMap<String, HashSet<String>>,
@@ -360,6 +348,20 @@ pub fn install_transaction(
     clean_graph(&mut graph);
 
     let mut remaining = graph;
+
+    let install_pkg = |pkg: &str| -> io::Result<()> {
+        let archive = archives
+            .get(pkg)
+            .ok_or_else(|| io::Error::other(format!("missing archive for {pkg}")))?;
+
+        println!("Installing {pkg}");
+
+        let files = unpack_package(archive, &root.root_path).map_err(io::Error::other)?;
+        let package = parse_pkg_info(&read_pkg_info(archive).map_err(io::Error::other)?)?;
+
+        mark_installed(pkg, &package.version, files, package.dependencies, root)?;
+        Ok(())
+    };
 
     while !remaining.is_empty() {
         let ready: Vec<String> = remaining
@@ -370,52 +372,23 @@ pub fn install_transaction(
 
         if ready.is_empty() {
             println!("Dependency cycle detected, installing remaining packages together:");
+            let cycle_pkgs: Vec<String> = remaining.keys().cloned().collect();
 
-            for pkg in remaining.keys() {
+            for pkg in &cycle_pkgs {
                 println!("  {pkg}");
+                install_pkg(pkg)?;
             }
-
-            let ready: Vec<String> = remaining.keys().cloned().collect();
-
-            for pkg in ready {
-                let archive = archives
-                    .get(&pkg)
-                    .ok_or_else(|| io::Error::other(format!("missing archive for {pkg}")))?;
-
-                println!("Installing {pkg}");
-
-                let files = unpack_package(archive, &root.root_path).map_err(io::Error::other)?;
-
-                let package = parse_pkg_info(&read_pkg_info(archive).map_err(io::Error::other)?)?;
-
-                mark_installed(&pkg, &package.version, files, package.dependencies, root)?;
-
-                remaining.remove(&pkg);
-            }
-
             break;
         }
 
         for pkg in ready {
-            let archive = archives
-                .get(&pkg)
-                .ok_or_else(|| io::Error::other(format!("missing archive for {pkg}")))?;
-
-            println!("Installing {pkg}");
-
-            let files = unpack_package(archive, &root.root_path).map_err(io::Error::other)?;
-
-            let package = parse_pkg_info(&read_pkg_info(archive).map_err(io::Error::other)?)?;
-
-            mark_installed(&pkg, &package.version, files, package.dependencies, root)?;
-
+            install_pkg(&pkg)?;
             remaining.remove(&pkg);
         }
     }
 
     Ok(())
 }
-
 pub fn run_install(args: &[String], root: &SomeRoot) -> std::io::Result<()> {
     if let Err(e) = require_args(args, 1, "Usage: rpk -S <package> [package...]") {
         eprintln!("{}", e);
