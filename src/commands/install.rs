@@ -252,7 +252,7 @@ pub fn resolve(
         return Ok(());
     }
 
-    let data_file = get_data_file(index, pkg)?;
+    let data_file = get_data_file(index, &real_pkg)?;
     let deps = read_data_into_hashset(&data_file)?;
 
     let deps = deps
