@@ -118,8 +118,18 @@ pub fn run_sys_update(root: &SomeRoot) -> io::Result<()> {
         }
     });
 
-    for pkg in outdated.into_inner().unwrap() {
-        update_pkg(&index, &pkg, root)?;
-    }
+    let outdated = outdated.into_inner().unwrap();
+
+    thread::scope(|s| {
+        for pkg in outdated {
+            let index = &index;
+
+            s.spawn(move || {
+                if let Err(e) = update_pkg(index, &pkg, root) {
+                    eprintln!("Failed to update {}: {}", pkg, e);
+                }
+            });
+        }
+    });
     Ok(())
 }

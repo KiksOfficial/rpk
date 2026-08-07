@@ -1,5 +1,5 @@
 use crate::SomeRoot;
-use crate::commands::install::{Package, is_installed};
+use crate::commands::install::is_installed;
 use crate::handle_diff_errors::require_args;
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, remove_dir, remove_dir_all, remove_file};
@@ -170,10 +170,6 @@ pub fn remove_package_from_db(pkg_name: &str, root: &SomeRoot) -> io::Result<()>
     fs::write(db_path, filtered.join("\n") + "\n")?;
 
     Ok(())
-}
-
-pub fn check_if_pkg_deps_on_pkg_to_delete(pkg: &Package) -> std::io::Result<bool> {
-    let does_depened = false;
 }
 
 pub fn run_remove(argumendid: &[String], root: &SomeRoot) -> std::io::Result<()> {

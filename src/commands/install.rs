@@ -363,6 +363,8 @@ pub fn install_transaction(
         let files = unpack_package(archive, &root.root_path).map_err(io::Error::other)?;
         let package = parse_pkg_info(&read_pkg_info(archive).map_err(io::Error::other)?)?;
 
+        println!("{:?}", &package);
+
         mark_installed(
             pkg,
             &package.version,
