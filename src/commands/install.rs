@@ -85,6 +85,7 @@ pub fn build_repos_hashmap(
 
     if !db_dir.exists() {
         println!("Directory does not exist!");
+        return Ok(index);
     }
     for entry in read_dir(db_dir)? {
         let entry = entry?.path();
@@ -161,6 +162,7 @@ pub fn mark_installed(
     version: &str,
     files: Vec<String>,
     depends: Vec<String>,
+    sonames: Vec<String>,
     root: &SomeRoot,
 ) -> io::Result<()> {
     let lib_dir = root.root_path.join("var/lib");
@@ -172,6 +174,8 @@ pub fn mark_installed(
     write(files_dir.join("files.txt"), files.join("\n"))?;
 
     write(files_dir.join("version.txt"), version)?;
+
+    write(files_dir.join("sonames.txt"), sonames.join("\n"))?;
 
     let mut entries = if db_path.exists() {
         read_to_string(&db_path)?
@@ -359,7 +363,14 @@ pub fn install_transaction(
         let files = unpack_package(archive, &root.root_path).map_err(io::Error::other)?;
         let package = parse_pkg_info(&read_pkg_info(archive).map_err(io::Error::other)?)?;
 
-        mark_installed(pkg, &package.version, files, package.dependencies, root)?;
+        mark_installed(
+            pkg,
+            &package.version,
+            files,
+            package.dependencies,
+            package.soname_dependencies,
+            root,
+        )?;
         Ok(())
     };
 
