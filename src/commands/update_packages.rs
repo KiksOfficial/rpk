@@ -9,8 +9,7 @@ use crate::filesystem::{read_pkg_info, unpack_package};
 use std::collections::HashMap;
 use std::fs::{self, read_dir};
 use std::io;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::thread;
 
@@ -82,6 +81,7 @@ pub fn update_pkg(
         &package.version,
         files,
         package.dependencies,
+        package.soname_dependencies,
         root,
     )?;
     fs::remove_file(archive)?;
