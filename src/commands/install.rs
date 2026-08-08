@@ -66,7 +66,7 @@ pub fn download_file(url: &str, output_path: &Path) -> io::Result<()> {
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "incorrect file path"))?;
 
     let status = Command::new("curl")
-        .args(["-fsSL", "-o", path_str, url])
+        .args(["-fL", "--progress-bar", "-o", path_str, url])
         .status()?;
     if status.success() {
         Ok(())
@@ -301,6 +301,8 @@ pub fn run_new_install(
 
                 verify_sig(&sig, &path)?;
 
+                println!("Downloading {}", &pkg);
+
                 Ok((pkg, path))
             })
         })
@@ -363,8 +365,6 @@ pub fn install_transaction(
         let files = unpack_package(archive, &root.root_path).map_err(io::Error::other)?;
         let package = parse_pkg_info(&read_pkg_info(archive).map_err(io::Error::other)?)?;
 
-        println!("{:?}", &package);
-
         mark_installed(
             pkg,
             &package.version,
@@ -412,18 +412,11 @@ pub fn run_install(args: &[String], root: &SomeRoot) -> std::io::Result<()> {
 
     let mut visited = HashSet::new();
     let mut graph = HashMap::new();
-
-    println!("gdk-pixbuf2 = {:?}", index.get("gdk-pixbuf2"));
-    println!("glycin = {:?}", index.get("glycin"));
-    println!("libglvnd = {:?}", index.get("libglvnd"));
-    println!("nvidia-utils = {:?}", index.get("nvidia-utils"));
-
-    resolve(&index, &args[0], &mut visited, &mut graph, root)?;
+    for pkg in args {
+        resolve(&index, pkg, &mut visited, &mut graph, root)?;
+    }
 
     let archives = run_new_install(Arc::new(index), visited)?;
-
-    println!("{:#?}", &graph);
-    println!("{:#?}", &archives);
 
     install_transaction(archives, graph, root)?;
 

@@ -28,7 +28,7 @@ struct SomeRoot {
 fn show_help() {
     eprintln!("Command not found");
     println!(
-        "-Sy                updates mirrors\n-S                 downloads packages\n-Syu               download latest mirrors and update all packages\n-R                 remove package ant its dependencies\n-Q                 list packages"
+        "-Sy                updates mirrors\n-S                 downloads packages\n-Syu               download latest mirrors and update all packages\n-R                 remove package and its dependencies\n-Q                 list packages"
     );
 }
 

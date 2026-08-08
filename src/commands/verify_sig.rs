@@ -19,9 +19,16 @@ pub fn download_sig(pkg_link: &str, output_path: &Path) -> io::Result<()> {
 
 pub fn verify_sig<'a>(sig_path: &'a Path, pkg_path: &Path) -> std::io::Result<&'a Path> {
     let status = Command::new("gpg")
-        .args(["--homedir", "/etc/pacman.d/gnupg", "--verify"])
+        .args([
+            "--homedir",
+            "/etc/pacman.d/gnupg",
+            "--verify",
+            "--no-verbose",
+        ])
         .arg(sig_path)
         .arg(pkg_path)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
         .status()?;
 
     if !status.success() {

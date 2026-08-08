@@ -157,6 +157,21 @@ pub fn remove_package_recursive(
 
     Ok(())
 }
+
+pub fn check_sonames(
+    pkg: &str,
+    reverse: &HashMap<String, Vec<String>>,
+    requested: &HashSet<String>,
+    removed: &HashSet<String>,
+    root: &SomeRoot,
+) -> bool {
+    match reverse.get(pkg) {
+        Some(dependents) => dependents.iter().all(|dep| {
+            requested.contains(dep) || removed.contains(dep) || !is_installed(dep, root)
+        }),
+        None => true,
+    }
+}
 pub fn remove_package_from_db(pkg_name: &str, root: &SomeRoot) -> io::Result<()> {
     let db_path = root.root_path.join("var/lib/rpk_db.txt");
 
@@ -195,6 +210,7 @@ pub fn run_remove(argumendid: &[String], root: &SomeRoot) -> std::io::Result<()>
     let reverse = match build_reverse_hashmap(&db) {
         Ok(x) => {
             println!("Reverse DB loaded");
+            println!("{:?}", &x);
             x
         }
         Err(e) => {
@@ -205,13 +221,21 @@ pub fn run_remove(argumendid: &[String], root: &SomeRoot) -> std::io::Result<()>
 
     let mut removed = HashSet::new();
 
+    let requested: HashSet<String> = argumendid.iter().cloned().collect();
+
     println!("ok");
 
     for arg in argumendid.iter() {
         println!("Removing {}", arg);
 
-        if let Err(e) = remove_package_recursive(arg, &dependencies, &reverse, &mut removed, root) {
-            eprintln!("Remove failed: {}", e);
+        if check_sonames(arg, &reverse, &requested, &removed, root) {
+            if let Err(e) =
+                remove_package_recursive(arg, &dependencies, &reverse, &mut removed, root)
+            {
+                eprintln!("Remove failed: {}", e);
+            }
+        } else {
+            eprintln!("cant remove");
         }
     }
     Ok(())
