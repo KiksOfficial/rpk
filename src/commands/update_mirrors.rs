@@ -1,4 +1,4 @@
-use crate::commands::install;
+use crate::download;
 use crate::filesystem::unpack_package;
 use std::fs;
 use std::io;
@@ -30,7 +30,7 @@ pub fn update_mirrors() -> io::Result<()> {
             }
 
             println!("Downloading {url}...");
-            install::download_file(&url, &src_path)?;
+            download::download_file(&url, &src_path)?;
 
             println!("Unpacking {:?} -> {:?}", src_path, dest_path);
             let _ = unpack_package(&src_path, &dest_path);

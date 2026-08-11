@@ -4,7 +4,7 @@ use std::{
     process::Command,
 };
 
-use crate::commands::install::download_file;
+use crate::download::download_file;
 
 pub fn download_sig(pkg_link: &str, output_path: &Path) -> io::Result<()> {
     let sig_url = format!("{pkg_link}.sig");

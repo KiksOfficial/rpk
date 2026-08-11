@@ -1,7 +1,10 @@
 mod commands;
+mod deps;
+mod download;
 mod filesystem;
 mod handle_diff_errors;
-
+mod package;
+mod repo;
 mod unstable;
 
 use commands::display_info::display_info;

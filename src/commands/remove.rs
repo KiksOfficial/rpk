@@ -1,6 +1,6 @@
 use crate::SomeRoot;
-use crate::commands::install::is_installed;
 use crate::handle_diff_errors::require_args;
+use crate::package::database::is_installed;
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, remove_dir, remove_dir_all, remove_file};
 use std::io;
@@ -210,7 +210,6 @@ pub fn run_remove(argumendid: &[String], root: &SomeRoot) -> std::io::Result<()>
     let reverse = match build_reverse_hashmap(&db) {
         Ok(x) => {
             println!("Reverse DB loaded");
-            println!("{:?}", &x);
             x
         }
         Err(e) => {
@@ -235,7 +234,7 @@ pub fn run_remove(argumendid: &[String], root: &SomeRoot) -> std::io::Result<()>
                 eprintln!("Remove failed: {}", e);
             }
         } else {
-            eprintln!("cant remove");
+            eprintln!("The pkg can't be removed since another pkg uses one of its deps");
         }
     }
     Ok(())

@@ -1,10 +1,13 @@
 use crate::SomeRoot;
-use crate::commands::install::{
-    Package, build_repos_hashmap, download_file, get_link, mark_installed, parse_pkg_info,
-};
+
 use crate::commands::update_mirrors::update_mirrors;
 use crate::commands::verify_sig::{download_sig, verify_sig};
+use crate::download::download_file;
 use crate::filesystem::{read_pkg_info, unpack_package};
+use crate::package::database::mark_installed;
+use crate::package::metadata::Package;
+use crate::package::metadata::parse_pkg_info;
+use crate::repo::{build_repos_hashmap, get_link};
 
 use std::collections::HashMap;
 use std::fs::{self, read_dir};
