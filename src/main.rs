@@ -1,4 +1,5 @@
 mod commands;
+mod declarative;
 mod deps;
 mod download;
 mod filesystem;
@@ -12,6 +13,7 @@ use commands::install::run_install;
 use commands::list::list_installed;
 use commands::remove::run_remove;
 use commands::update_mirrors::update_mirrors;
+use declarative::make_config::make_config;
 use std::env;
 use std::path::PathBuf;
 
@@ -31,7 +33,7 @@ struct SomeRoot {
 fn show_help() {
     eprintln!("Command not found");
     println!(
-        "-Sy                updates mirrors\n-S                 downloads packages\n-Syu               download latest mirrors and update all packages\n-R                 remove package and its dependencies\n-Q                 list packages"
+        "-Sy                updates mirrors\n-S                 downloads packages\n-Syu               download latest mirrors and update all packages\n-R                 remove package and its dependencies\n-Q                 list packages\n -Ss                 display pkg info"
     );
 }
 
@@ -68,6 +70,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         "-Q" => list_installed(&root)?,
         "-Ss" => display_info(&argumendid[2..], &root)?,
+        "--make-config" => make_config(&root)?,
         "test" => {
             println!("For testing unstable stuff")
         }
