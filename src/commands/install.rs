@@ -9,6 +9,8 @@ use crate::package::metadata::parse_pkg_info;
 use crate::repo::build_repos_hashmap;
 
 use std::collections::{HashMap, HashSet};
+use std::fs::File;
+use std::io::ErrorKind::FileTooLarge;
 use std::io::{self};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -88,6 +90,13 @@ pub fn run_install(args: &[String], root: &SomeRoot) -> std::io::Result<()> {
     let archives = run_new_install(Arc::new(index), visited)?;
 
     install_transaction(archives, graph, root)?;
+
+    for pkg in args {
+        File::create(
+            root.root_path
+                .join(format!("var/lib/rpk_files/{}/explicit", &pkg)),
+        )?;
+    }
 
     Ok(())
 }
