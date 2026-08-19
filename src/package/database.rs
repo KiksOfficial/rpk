@@ -1,9 +1,7 @@
 use crate::SomeRoot;
-use std::collections::HashMap;
 use std::fs::{create_dir_all, read_to_string, write};
 use std::io::{self};
 use std::path::Path;
-use std::path::PathBuf;
 
 pub fn is_installed(pkg: &str, root: &SomeRoot) -> bool {
     match read_to_string(root.root_path.join(Path::new("var/lib/rpk_db.txt"))) {
@@ -53,18 +51,4 @@ pub fn mark_installed(
     println!("Recording {} dependencies: {:?}", pkg, depends);
 
     Ok(())
-}
-
-pub fn get_data_file(
-    index: &HashMap<String, (String, String, String, PathBuf)>,
-    pkg_name: &str,
-) -> io::Result<PathBuf> {
-    if let Some((_, _, _, path)) = index.get(pkg_name) {
-        return Ok(path.join("desc"));
-    }
-
-    Err(io::Error::new(
-        io::ErrorKind::NotFound,
-        format!("package {pkg_name} not found"),
-    ))
 }

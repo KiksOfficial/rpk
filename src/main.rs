@@ -24,7 +24,7 @@ enum RootKind {
     RealRoot,
 }
 
-#[warn(dead_code)]
+#[allow(dead_code)]
 struct SomeRoot {
     pub kind: RootKind,
     pub root_path: PathBuf,
@@ -68,7 +68,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             run_remove(&argumendid[2..], &root)?;
         }
 
-        "-Q" => list_installed(&root)?,
+        "-Qe" => list_installed(&root, true)?,
+        "-Q" => list_installed(&root, false)?,
         "-Ss" => display_info(&argumendid[2..], &root)?,
         "--make-config" => make_config(&root)?,
         "test" => {

@@ -10,7 +10,6 @@ use crate::repo::build_repos_hashmap;
 
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
-use std::io::ErrorKind::FileTooLarge;
 use std::io::{self};
 use std::path::PathBuf;
 use std::sync::Arc;
