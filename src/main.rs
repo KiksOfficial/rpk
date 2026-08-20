@@ -13,7 +13,7 @@ use commands::install::run_install;
 use commands::list::list_installed;
 use commands::remove::run_remove;
 use commands::update_mirrors::update_mirrors;
-use declarative::make_config::make_config;
+use declarative::{apply_config::read_config, make_config::make_config};
 use std::env;
 use std::path::PathBuf;
 
