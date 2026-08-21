@@ -1,15 +1,18 @@
+use std::env;
 use std::fs::{self, read_to_string};
 use std::io;
-use std::path::Path;
+use std::os::unix::fs::symlink;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use crate::SomeRoot;
 use crate::commands::install::run_install;
 
 #[derive(Debug, Default)]
-struct ParsedConf {
-    pkgs: Vec<String>,
-    dots: Vec<String>,
-    repo: String,
+pub struct ParsedConf {
+    pub pkgs: Vec<String>,
+    pub dots: Vec<String>,
+    pub repo: String,
 }
 
 enum AppendMode {
@@ -43,7 +46,14 @@ pub fn read_config(fail: &Path) -> std::io::Result<ParsedConf> {
 }
 
 pub fn build__from_config(obje: &ParsedConf, root: &SomeRoot) -> io::Result<()> {
-    run_install(&obje.pkgs, root);
+    run_install(&obje.pkgs, root)?;
+
+    let home = env::var("HOME").expect("Cant get home dir");
+    let dotfiles_path = PathBuf::from(home).join(".dotfiles");
+    Command::new("git")
+        .args(["clone", &obje.repo])
+        .arg(&dotfiles_path)
+        .status()?;
 
     Ok(())
 }
