@@ -15,9 +15,10 @@ use commands::remove::run_remove;
 use commands::update_mirrors::update_mirrors;
 use declarative::{apply_config::read_config, make_config::make_config};
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::commands::update_packages::run_sys_update;
+use crate::declarative::apply_config::run_use_config;
 
 enum RootKind {
     FakeRoot,
@@ -72,6 +73,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "-Q" => list_installed(&root, false)?,
         "-Ss" => display_info(&argumendid[2..], &root)?,
         "--make-config" => make_config(&root)?,
+        "--use-config" => run_use_config(&root, &argumendid[2])?,
         "test" => {
             println!("For testing unstable stuff")
         }

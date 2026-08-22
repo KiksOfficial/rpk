@@ -8,36 +8,43 @@ use crate::SomeRoot;
 #[derive(Debug)]
 struct Config {
     packages: Vec<String>,
-    dotfiles: Vec<Dotfile>,
-}
-
-#[derive(Debug)]
-struct Dotfile {
-    path: PathBuf,
+    dotfiles: Vec<String>,
+    repo: String,
 }
 
 pub fn make_config(root: &SomeRoot) -> io::Result<()> {
     let username = std::env::var("USER").map_err(|e| io::Error::new(io::ErrorKind::NotFound, e))?;
 
     let home_dir = PathBuf::from("/").join("home").join(&username);
-    //let config_dir = home_dir.join(".config");
-    //
-    let config_dir = PathBuf::from("/home/kiks/.config");
+
+    let config_dir = PathBuf::from(home_dir.join(username).join(".config"));
     let mut config = Config {
         packages: Vec::new(),
         dotfiles: Vec::new(),
+        repo: String::new(),
     };
+
+    print!("Enter repo link: ");
+    io::stdout().flush()?;
+
+    let mut buffer = String::new();
+
+    io::stdin()
+        .read_line(&mut buffer)
+        .expect("Failed to read input");
+
+    config.repo = (*buffer.trim()).to_string();
 
     if config_dir.is_dir() {
         for entry in fs::read_dir(&config_dir)? {
             let entry = entry?;
             let path = entry.path();
 
-            let relative = path.strip_prefix(&home_dir).map_err(io::Error::other)?;
-
-            config.dotfiles.push(Dotfile {
-                path: relative.to_path_buf(),
-            });
+            if let Some(file_name) = path.file_name() {
+                config
+                    .dotfiles
+                    .push(file_name.to_string_lossy().into_owned());
+            }
         }
     }
 
@@ -55,19 +62,18 @@ pub fn make_config(root: &SomeRoot) -> io::Result<()> {
         }
     }
 
+    config.dotfiles.sort();
+    config.packages.sort();
+
     let output_path = root.root_path.join("home").join("declarative.txt");
 
     let mut file = File::create(output_path)?;
 
     let to_bew_written = format!(
-        "[Explicit packages]\n{}\n[Dotfiles]\n{}",
+        "[Repo]\n{}\n[Explicit packages]\n{}\n[Dotfiles]\n{}",
+        &config.repo,
         &config.packages.join("\n"),
-        &config
-            .dotfiles
-            .iter()
-            .map(|dotfile| dotfile.path.display().to_string())
-            .collect::<Vec<_>>()
-            .join("\n")
+        &config.dotfiles.join("\n")
     );
 
     writeln!(file, "{}", &to_bew_written)?;
