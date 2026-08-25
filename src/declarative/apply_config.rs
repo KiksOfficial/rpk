@@ -1,4 +1,5 @@
 use std::fs::{self, read_to_string};
+use std::io::ErrorKind;
 use std::io::{self};
 use std::os::unix::fs::symlink;
 use std::path::Path;
@@ -51,14 +52,14 @@ pub fn build_from_config(obje: &ParsedConf, root: &SomeRoot) -> io::Result<()> {
 
     //let home = env::var("HOME").expect("Cant get home dir");
     let dotfiles_path = &root.root_path.join("home/kiks").join(".dotfiles");
-    let _status = Command::new("git")
+    let status = Command::new("git")
         .args(["clone", &obje.repo])
         .arg(dotfiles_path)
         .status()?;
 
-    /*if !status.success() {
+    if !status.success() {
         return Err(io::Error::new(ErrorKind::Other, "Failed to clone"));
-    }*/
+    }
 
     let configs_vec = &obje.dots;
 
