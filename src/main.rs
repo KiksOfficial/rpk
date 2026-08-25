@@ -73,7 +73,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "-Q" => list_installed(&root, false)?,
         "-Ss" => display_info(&argumendid[2..], &root)?,
         "--make-config" => make_config(&root)?,
-        "--use-config" => run_use_config(&root, &argumendid[2])?,
+        "--apply-config" => run_use_config(&root, &argumendid[2])?,
         "test" => {
             println!("For testing unstable stuff")
         }

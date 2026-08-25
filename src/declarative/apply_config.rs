@@ -1,8 +1,7 @@
-use std::env;
 use std::fs::{self, read_to_string};
-use std::io::{self, ErrorKind};
+use std::io::{self};
 use std::os::unix::fs::symlink;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
 use crate::SomeRoot;
@@ -50,23 +49,27 @@ pub fn read_config(fail: &Path) -> std::io::Result<ParsedConf> {
 pub fn build_from_config(obje: &ParsedConf, root: &SomeRoot) -> io::Result<()> {
     run_install(&obje.pkgs, root)?;
 
-    let home = env::var("HOME").expect("Cant get home dir");
-    let dotfiles_path = PathBuf::from(&home).join(".dotfiles");
-    let status = Command::new("git")
+    //let home = env::var("HOME").expect("Cant get home dir");
+    let dotfiles_path = &root.root_path.join("home/kiks").join(".dotfiles");
+    let _status = Command::new("git")
         .args(["clone", &obje.repo])
-        .arg(&dotfiles_path)
+        .arg(dotfiles_path)
         .status()?;
 
-    if !status.success() {
+    /*if !status.success() {
         return Err(io::Error::new(ErrorKind::Other, "Failed to clone"));
-    }
+    }*/
 
     let configs_vec = &obje.dots;
 
     for config in configs_vec {
         let source_path = dotfiles_path.join(config);
 
-        let target_path = PathBuf::from(&home).join(".config").join(config);
+        let target_path = root
+            .root_path
+            .join("home/kiks")
+            .join(".config")
+            .join(config);
 
         if let Some(parent) = target_path.parent() {
             fs::create_dir_all(parent)?;
@@ -81,6 +84,7 @@ pub fn build_from_config(obje: &ParsedConf, root: &SomeRoot) -> io::Result<()> {
         }
 
         symlink(&source_path, &target_path)?;
+
         println!("Symlinked {:?} -> {:?}", target_path, source_path);
     }
     Ok(())

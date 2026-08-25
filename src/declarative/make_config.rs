@@ -17,7 +17,8 @@ pub fn make_config(root: &SomeRoot) -> io::Result<()> {
 
     let home_dir = PathBuf::from("/").join("home").join(&username);
 
-    let config_dir = PathBuf::from(home_dir.join(username).join(".config"));
+    let config_dir = home_dir.join(".config");
+    println!("{:?}", &config_dir);
     let mut config = Config {
         packages: Vec::new(),
         dotfiles: Vec::new(),
@@ -65,12 +66,26 @@ pub fn make_config(root: &SomeRoot) -> io::Result<()> {
     config.dotfiles.sort();
     config.packages.sort();
 
-    let output_path = root.root_path.join("home").join("declarative.txt");
+    let output_path = root
+        .root_path
+        .join("home")
+        .join("kiks")
+        .join("declarative.txt");
 
     let mut file = File::create(output_path)?;
 
     let to_bew_written = format!(
-        "[Repo]\n{}\n[Explicit packages]\n{}\n[Dotfiles]\n{}",
+        r#"[Repo]
+
+{}
+
+[Explicit packages]
+
+{}
+
+[Dotfiles]
+
+{}"#,
         &config.repo,
         &config.packages.join("\n"),
         &config.dotfiles.join("\n")
