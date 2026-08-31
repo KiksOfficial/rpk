@@ -14,7 +14,7 @@ pub fn download_file(url: &str, output_path: &Path) -> io::Result<()> {
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "incorrect file path"))?;
 
     let status = Command::new("curl")
-        .args(["-fL", "--progress-bar", "-o", path_str, url])
+        .args(["-fL", "-o", path_str, url])
         .status()?;
     if status.success() {
         Ok(())
@@ -39,19 +39,31 @@ pub fn run_new_install(
                 let link = get_link(&index, &pkg)
                     .ok_or_else(|| io::Error::other(format!("package {pkg} not found")))?;
 
-                let path = PathBuf::from(format!("/tmp/{pkg}.pkg.tar.zst"));
+                std::fs::create_dir_all("/var/cache/rpk/pkgs")?;
+                let path = PathBuf::from(format!("/var/cache/rpk/pkgs/{pkg}.pkg.tar.zst"));
 
-                println!("Downloading {pkg}");
+                if !path.exists() {
+                    println!("Downloading {pkg}");
 
-                let sig_url = format!("{}.sig", link);
-                let sig = PathBuf::from(format!("{}.sig", path.display()));
+                    let sig_url = format!("{}.sig", link);
+                    let sig = PathBuf::from(format!("{}.sig", path.display()));
 
-                download_file(&sig_url, &sig)?;
-                download_file(&link, &path)?;
+                    let tmp = path.with_extension("pkg.tar.zst.part");
 
-                verify_sig(&sig, &path)?;
+                    download_file(&sig_url, &sig)?;
+                    download_file(&link, &tmp)?;
 
-                println!("Downloading {}", &pkg);
+                    if let Err(e) = verify_sig(&sig, &tmp) {
+                        let _ = std::fs::remove_file(&tmp);
+                        let _ = std::fs::remove_file(&sig);
+                        return Err(e);
+                    }
+
+                    std::fs::rename(&tmp, &path)?;
+                    std::fs::remove_file(&sig)?;
+
+                    println!("Downloading {}", &pkg);
+                }
 
                 Ok((pkg, path))
             })

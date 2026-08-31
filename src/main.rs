@@ -8,14 +8,15 @@ mod package;
 mod repo;
 mod unstable;
 
+use commands::clear_cache::clear_cache;
 use commands::display_info::display_info;
 use commands::install::run_install;
 use commands::list::list_installed;
 use commands::remove::run_remove;
 use commands::update_mirrors::update_mirrors;
-use declarative::{apply_config::read_config, make_config::make_config};
+use declarative::make_config::make_config;
 use std::env;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use crate::commands::update_packages::run_sys_update;
 use crate::declarative::apply_config::run_use_config;
@@ -72,6 +73,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "-Qe" => list_installed(&root, true)?,
         "-Q" => list_installed(&root, false)?,
         "-Ss" => display_info(&argumendid[2..], &root)?,
+        "-Sc" => clear_cache(&root)?,
         "--make-config" => make_config(&root)?,
         "--apply-config" => run_use_config(&root, &argumendid[2])?,
         "test" => {

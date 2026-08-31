@@ -1,3 +1,4 @@
+pub mod clear_cache;
 pub mod display_info;
 pub mod install;
 pub mod list;
