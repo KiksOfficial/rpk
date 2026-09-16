@@ -49,11 +49,15 @@ pub fn get_installed_packages(root: &SomeRoot) -> io::Result<Vec<String>> {
 fn fetch_package(
     index: &HashMap<String, (String, String, String, PathBuf)>,
     package_name: &str,
+    root: &SomeRoot,
 ) -> io::Result<(Package, PathBuf)> {
     let pkg_link = get_link(index, package_name)
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "package not found"))?;
 
-    let output_path = Path::new("/tmp").join(format!("{package_name}.tar.zst"));
+    let output_path = root
+        .root_path
+        .join("var/cache/rpk/pkgs")
+        .join(format!("{package_name}.tar.zst"));
 
     println!("Downloading {}...", package_name);
     download_file(&pkg_link, &output_path)?;
@@ -73,7 +77,7 @@ pub fn update_pkg(
     package_name: &str,
     root: &SomeRoot,
 ) -> io::Result<()> {
-    let (package, archive) = fetch_package(index, package_name)?;
+    let (package, archive) = fetch_package(index, package_name, root)?;
 
     println!("Unpacking {}...", package_name);
 

@@ -5,6 +5,7 @@ use std::process::Command;
 use std::sync::Arc;
 use std::thread;
 
+use crate::SomeRoot;
 use crate::commands::verify_sig::verify_sig;
 use crate::repo::get_link;
 
@@ -29,25 +30,30 @@ pub fn download_file(url: &str, output_path: &Path) -> io::Result<()> {
 pub fn run_new_install(
     index: Arc<HashMap<String, (String, String, String, PathBuf)>>,
     packages: HashSet<String>,
+    root: &SomeRoot,
 ) -> io::Result<HashMap<String, PathBuf>> {
+    let cache_dir = root.root_path.join("var/cache/rpk/pkgs");
+    std::fs::create_dir_all(&cache_dir)?;
+    println!("{:?}", &cache_dir);
+    std::fs::create_dir_all(&cache_dir)?;
+
     let handles: Vec<_> = packages
         .into_iter()
         .map(|pkg| {
             let index = Arc::clone(&index);
+            let cache_dir = cache_dir.clone();
 
             thread::spawn(move || -> io::Result<(String, PathBuf)> {
                 let link = get_link(&index, &pkg)
                     .ok_or_else(|| io::Error::other(format!("package {pkg} not found")))?;
 
-                std::fs::create_dir_all("/var/cache/rpk/pkgs")?;
-                let path = PathBuf::from(format!("/var/cache/rpk/pkgs/{pkg}.pkg.tar.zst"));
+                let path = cache_dir.join(format!("{pkg}.pkg.tar.zst"));
 
                 if !path.exists() {
                     println!("Downloading {pkg}");
 
-                    let sig_url = format!("{}.sig", link);
+                    let sig_url = format!("{link}.sig");
                     let sig = PathBuf::from(format!("{}.sig", path.display()));
-
                     let tmp = path.with_extension("pkg.tar.zst.part");
 
                     download_file(&sig_url, &sig)?;
@@ -62,7 +68,7 @@ pub fn run_new_install(
                     std::fs::rename(&tmp, &path)?;
                     std::fs::remove_file(&sig)?;
 
-                    println!("Downloading {}", &pkg);
+                    println!("Downloaded {pkg}");
                 }
 
                 Ok((pkg, path))

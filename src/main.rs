@@ -62,6 +62,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{:?}", &argumendid);
     let operation = &argumendid[1];
 
+    let cache_dir = root.root_path.join("var/cache/rpk/pkgs");
+    std::fs::create_dir_all(&cache_dir)?;
+
     match operation.as_str() {
         "-Sy" => update_mirrors()?,
         "-S" => run_install(&argumendid[2..], &root)?,

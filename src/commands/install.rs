@@ -86,7 +86,7 @@ pub fn run_install(args: &[String], root: &SomeRoot) -> std::io::Result<()> {
         resolve(&index, pkg, &mut visited, &mut graph, root)?;
     }
 
-    let archives = run_new_install(Arc::new(index), visited)?;
+    let archives = run_new_install(Arc::new(index), visited, root)?;
 
     install_transaction(archives, graph, root)?;
 
