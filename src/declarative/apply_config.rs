@@ -1,5 +1,4 @@
 use std::fs::{self, read_to_string};
-use std::io::ErrorKind;
 use std::io::{self};
 use std::os::unix::fs::symlink;
 use std::path::Path;
@@ -58,7 +57,7 @@ pub fn build_from_config(obje: &ParsedConf, root: &SomeRoot) -> io::Result<()> {
         .status()?;
 
     if !status.success() {
-        return Err(io::Error::new(ErrorKind::Other, "Failed to clone"));
+        return Err(io::Error::other("Failed to clone"));
     }
 
     let configs_vec = &obje.dots;

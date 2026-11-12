@@ -59,7 +59,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         show_help();
         return Ok(());
     }
-    println!("{:?}", &argumendid);
+    println!("{:?}", argumendid);
     let operation = &argumendid[1];
 
     match operation.as_str() {

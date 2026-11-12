@@ -32,7 +32,7 @@ pub fn install_transaction(
 
         let files = unpack_package(archive, &root.root_path).map_err(io::Error::other)?;
         let package = parse_pkg_info(&read_pkg_info(archive).map_err(io::Error::other)?)?;
-        println!("{:?}", &package);
+        println!("{:?}", package);
 
         mark_installed(
             pkg,
@@ -93,7 +93,7 @@ pub fn run_install(args: &[String], root: &SomeRoot) -> std::io::Result<()> {
     for pkg in args {
         File::create(
             root.root_path
-                .join(format!("var/lib/rpk_files/{}/explicit", &pkg)),
+                .join(format!("var/lib/rpk_files/{}/explicit", pkg)),
         )?;
     }
 

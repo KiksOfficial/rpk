@@ -9,13 +9,13 @@ pub fn list_installed(root: &SomeRoot, explicit: bool) -> io::Result<()> {
         if let Some(name) = rida.split_once(':') {
             let pkg_path = root
                 .root_path
-                .join(format!("var/lib/rpk_files/{}/explicit", &name.0.trim()));
+                .join(format!("var/lib/rpk_files/{}/explicit", name.0.trim()));
             if pkg_path.exists() && explicit {
-                println!("{}", &name.0.trim());
+                println!("{}", name.0.trim());
             }
 
             if !explicit {
-                println!("{}", &name.0.trim());
+                println!("{}", name.0.trim());
             }
         }
     }
