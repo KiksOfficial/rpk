@@ -51,14 +51,14 @@ pub fn build_from_config(obje: &ParsedConf, root: &SomeRoot) -> io::Result<()> {
 
     //let home = env::var("HOME").expect("Cant get home dir");
     let dotfiles_path = &root.root_path.join("home/kiks").join(".dotfiles");
-    let _status = Command::new("git")
+    let status = Command::new("git")
         .args(["clone", &obje.repo])
         .arg(dotfiles_path)
         .status()?;
 
-    /*if !status.success() {
-        return Err(io::Error::new(ErrorKind::Other, "Failed to clone"));
-    }*/
+    if !status.success() {
+        return Err(io::Error::other("Failed to clone"));
+    }
 
     let configs_vec = &obje.dots;
 

@@ -68,7 +68,7 @@ pub fn run_new_install(
                     std::fs::rename(&tmp, &path)?;
                     std::fs::remove_file(&sig)?;
 
-                    println!("Downloaded {pkg}");
+                    println!("Downloading {}", pkg);
                 }
 
                 Ok((pkg, path))

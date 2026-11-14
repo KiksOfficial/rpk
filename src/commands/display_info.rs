@@ -10,7 +10,7 @@ pub fn display_info(pkg_names: &[String], root: &SomeRoot) -> std::io::Result<()
             .join("version.txt");
         let version = fs::read_to_string(path)?;
 
-        println!("{} - {}", &pkg_name, &version.trim());
+        println!("{} - {}", pkg_name, version.trim());
 
         let path2 = root.root_path.join("var/lib/rpk_db.txt");
         let deps_rida = fs::read_to_string(path2)?;

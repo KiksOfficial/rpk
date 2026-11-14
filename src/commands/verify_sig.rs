@@ -10,7 +10,7 @@ pub fn download_sig(pkg_link: &str, output_path: &Path) -> io::Result<()> {
     let sig_url = format!("{pkg_link}.sig");
 
     let sig_output = PathBuf::from(format!("{}.sig", output_path.display()));
-    println!("{:?}", &sig_output);
+    println!("{:?}", sig_output);
 
     download_file(&sig_url, &sig_output)?;
 
