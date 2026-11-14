@@ -35,7 +35,16 @@ struct SomeRoot {
 fn show_help() {
     eprintln!("Command not found");
     println!(
-        "-Sy                updates mirrors\n-S                 downloads packages\n-Syu               download latest mirrors and update all packages\n-R                 remove package and its dependencies\n-Q                 list packages\n -Ss                 display pkg info"
+        "r#
+
+-Sy                   updates mirrors
+-S [pkg]              downloads packages
+-Syu                  download latest mirrors and update all packages
+-R [pkg]              remove package and its dependencies
+-Q                    list packages
+-Ss [pkg              display pkg info
+--make-config         generates a config file
+--apply-config [file] applies config from a file    "
     );
 }
 
@@ -61,9 +70,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     println!("{:?}", &argumendid);
     let operation = &argumendid[1];
-
-    let cache_dir = root.root_path.join("var/cache/rpk/pkgs");
-    std::fs::create_dir_all(&cache_dir)?;
 
     match operation.as_str() {
         "-Sy" => update_mirrors()?,

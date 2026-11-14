@@ -99,6 +99,9 @@ pub fn update_pkg(
 pub fn run_sys_update(root: &SomeRoot) -> io::Result<()> {
     update_mirrors()?;
 
+    let cache_dir = root.root_path.join("var/cache/rpk/pkgs");
+    std::fs::create_dir_all(&cache_dir)?;
+
     let mut index = build_repos_hashmap("core")?;
     let extra = build_repos_hashmap("extra")?;
     index.extend(extra);

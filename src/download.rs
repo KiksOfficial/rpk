@@ -15,7 +15,7 @@ pub fn download_file(url: &str, output_path: &Path) -> io::Result<()> {
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "incorrect file path"))?;
 
     let status = Command::new("curl")
-        .args(["-fL", "-o", path_str, url])
+        .args(["-fLs", "-o", path_str, url])
         .status()?;
     if status.success() {
         Ok(())

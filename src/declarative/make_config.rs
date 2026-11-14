@@ -36,11 +36,6 @@ pub fn make_config(root: &SomeRoot) -> io::Result<()> {
 
     config.repo = (*buffer.trim()).to_string();
 
-    println!("username: {username}");
-    println!("config_dir: {:?}", config_dir);
-    println!("exists: {}", config_dir.exists());
-    println!("is_dir: {}", config_dir.is_dir());
-
     if config_dir.is_dir() {
         for entry in fs::read_dir(&config_dir)? {
             let entry = entry?;
