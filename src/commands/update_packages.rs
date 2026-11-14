@@ -12,7 +12,7 @@ use crate::repo::{build_repos_hashmap, get_link};
 use std::collections::HashMap;
 use std::fs::{self, read_dir};
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Mutex;
 use std::thread;
 
